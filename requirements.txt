@@ -1,0 +1,21 @@
+# Phase 1 - Ingestion
+tree-sitter==0.21.3
+tree-sitter-python==0.21.0
+tree-sitter-languages==1.10.2
+sqlglot==25.0.0
+gitpython==3.1.43
+
+# Phase 2 - Embedding (a decommenter quand tu attaques la phase 2)
+# qdrant-client==1.9.1
+# openai==1.30.0
+# tiktoken==0.7.0
+
+# Phase 3 - Generation LLM
+# anthropic==0.28.0
+# langchain==0.2.0
+# langchain-community==0.2.0
+
+# Utilitaires
+python-dotenv==1.0.1
+pydantic==2.7.0
+rich==13.7.1
