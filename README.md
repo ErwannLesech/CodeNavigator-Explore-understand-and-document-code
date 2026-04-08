@@ -1,56 +1,132 @@
 # CodeNavigator
 
-AI-powered codebase documentation engine: AST parsing, LLM doc generation, knowledge graph, SQL lineage and RAG chatbot. MCP-ready.
+CodeNavigator est un outil d'exploration de codebase et de generation de
+documentation assistee par IA (parsing multi-langages, extraction de structure,
+export Markdown, contexte graphe, RAG).
 
-## Project Structure
+Ce README decrit l'etat reel du projet au 2026-04-08.
+
+## Etat actuel (resume)
+
+- Ingestion: operationnelle (repo walker + parser Python + parser SQL + fallback
+   tree-sitter).
+- Generation de docs: code present et fonctionnel, avec appels Mistral.
+- RAG chatbot: code present (CLI + route API), avec retrieval et contexte graphe.
+- Embedding et graph build/index pipeline: references dans le CLI, mais modules
+   manquants dans ce workspace (dossiers `embedding/` et `graph/` incomplets).
+- Tests: presents sur ingestion uniquement.
+- Artefacts de sortie: documentation et graph deja generes dans `data/output/`.
+
+## Structure actuelle du repo
 
 ```text
 CodeNavigator/
-|- ingestion/          # Parsing AST (tree-sitter, sqlglot)
-|- embedding/          # Chunking + vectorisation + Qdrant
-|- generation/         # Prompts LLM + generation doc
-|- graph/              # Knowledge graph NetworkX + Mermaid exports
-|- rag/                # Pipeline RAG + chatbot
-|- api/                # FastAPI layer
+|- api/
+|  `- chat.py
+|- generation/
+|  |- assembler.py
+|  |- doc_generator.py
+|  |- exporter.py
+|  `- prompts.py
+|- ingestion/
+|  |- repo_walker.py
+|  |- parser_dispatcher.py
+|  |- python_parser.py
+|  |- sql_parser.py
+|  `- treesitter_parser.py
+|- rag/
+|  |- chatbot.py
+|  |- cli.py
+|  |- graph_context.py
+|  `- retriever.py
 |- tests/
+|  `- ingestion/
 |- data/
-|  |- input/           # Codebase to analyze (or Git URL)
-|  |- output/          # Generated docs, diagrams, indexes
+|  |- input/
+|  `- output/
 |- main.py
-|- requirements.txt
-|- .env.example
-`- README.md
+`- requirements.txt
 ```
 
-## Phase 1 Scope
+## Ce qui fonctionne deja
 
-- Repository walker with extension filtering
-- Python AST parser (built-in ast)
-- Minimal execution entrypoint for validation
+### 1) Ingestion
 
-## Quick Start
+- `ingestion/repo_walker.py`
+   - Parcourt un repo local ou clone un repo Git URL.
+   - Filtre les extensions supportees (`.py`, `.sql`, `.js`, `.ts`).
+   - Ignore les dossiers techniques (`.venv`, `node_modules`, `.git`, etc.).
+- `ingestion/python_parser.py`
+   - Extrait imports, fonctions top-level, classes, methodes, docstrings, lignes.
+- `ingestion/sql_parser.py`
+   - Parse schemas/table definitions et requetes (lineage lecture/ecriture,
+      colonnes, joins) via `sqlglot`.
+- `ingestion/treesitter_parser.py`
+   - Extraction generique pour JS/TS/Python quand tree-sitter est disponible.
+- `ingestion/parser_dispatcher.py`
+   - Route automatiquement vers le parser adapte selon le langage.
 
-1. Install dependencies:
+### 2) Generation Markdown (LLM)
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+- `generation/doc_generator.py`
+   - Utilise l'API Mistral (`MISTRAL_API_KEY` requise).
+- `generation/assembler.py`
+   - Assemble docs fonctions/classes/tables + synthese module/projet.
+- `generation/exporter.py`
+   - Exporte en Markdown (`README.md`, `INDEX.md`, docs par module).
 
-2. Add a sample repository under data/input/sample_repo.
+### 3) RAG (chat)
 
-3. Run the ingestion validation:
+- CLI: `rag/cli.py`
+- Bot conversationnel: `rag/chatbot.py`
+- Route FastAPI: `api/chat.py`
+- Contexte graphe: `rag/graph_context.py`
 
-   ```bash
-   python main.py
-   ```
+## Limitations connues dans ce workspace
 
-## Current Ingestion Modules
+- `main.py` importe:
+   - `embedding.indexer`
+   - `graph.builder`
+   - `graph.mermaid_exporter`
+   - `graph.json_exporter`
+- Ces modules ne sont pas presents actuellement dans les dossiers
+   `embedding/` et `graph/` (qui contiennent seulement `__pycache__/`).
+- Consequence: certaines commandes CLI declarees dans `main.py` ne sont pas
+   executables telles quelles tant que ces modules ne sont pas restaures.
 
-- ingestion/repo_walker.py: Accepts local path or Git URL, walks recursively with extension filters, and returns structured file metadata and content.
-- ingestion/python_parser.py: Parses imports, top-level functions and classes, and extracts method signatures, decorators, docstrings, and line numbers.
+## Commandes CLI ciblees (quand tous les modules sont presents)
 
-## Next Logical Steps
+```bash
+python main.py index --repo <path-ou-git-url>
+python main.py generate --repo <path-ou-git-url>
+python main.py graph --repo <path-ou-git-url>
+python main.py full --repo <path-ou-git-url>
+python main.py chat --graph data/output/graph/graph.json
+```
 
-1. Add SQL parser using sqlglot.
-2. Introduce tree-sitter for multi-language parsing behind a common interface.
-3. Add unit tests for walker filters and parser extraction accuracy.
+## Tests
+
+- Jeux de tests disponibles: `tests/ingestion/`
+   - `test_repo_walker.py`
+   - `test_python_parser.py`
+   - `test_sql_parser.py`
+   - `test_parser_dispatcher.py`
+- Pas de tests automatises visibles pour `generation/`, `rag/` et `api/` dans
+   l'etat actuel.
+
+## Dependances principales
+
+- Parsing: `tree-sitter`, `tree-sitter-languages`, `sqlglot`, `gitpython`
+- LLM: `mistralai`
+- API/config: `pydantic`, `python-dotenv`
+- CLI output: `rich`
+- Graph (declare): `networkx`
+
+## Roadmap recommandee (prochaines etapes)
+
+1. Restaurer/ajouter les modules `embedding/*` et `graph/*` manquants pour
+    rendre `main.py` executable end-to-end.
+2. Ajouter des tests sur `generation/`, `rag/` et `api/chat.py`.
+3. Ajouter un mode de verification locale (sans appel LLM) pour valider le
+    pipeline en CI.
+4. Documenter un workflow de demarrage unique (env vars + commandes minimales).
