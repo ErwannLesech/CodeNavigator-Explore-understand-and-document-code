@@ -2,14 +2,14 @@ from ingestion.sql_parser import parse_sql_file
 
 
 def test_parse_sql_file_extracts_schema_and_query() -> None:
-    sql = '''
+    sql = """
 CREATE TABLE users (
     id INT PRIMARY KEY,
     email TEXT NOT NULL
 );
 
 SELECT id, email FROM users;
-'''
+"""
 
     result = parse_sql_file(source=sql, file_path="schema.sql", dialect="postgres")
 
