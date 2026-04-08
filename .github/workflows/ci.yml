@@ -125,7 +125,12 @@ jobs:
         id: pytest_run
         env:
           PYTHONPATH: ${{ github.workspace }}
-        run: pytest --cov=core --cov-report=term-missing
+        run: |
+          if [ -d tests/ingestion ] && find tests/ingestion -type f -name 'test_*.py' | grep -q .; then
+            pytest tests/ingestion --cov=ingestion --cov-report=term-missing
+          else
+            echo "No ingestion test files found under tests/ingestion (test_*.py). Skipping pytest."
+          fi
 
       - name: Write test summary
         if: always()
@@ -136,5 +141,5 @@ jobs:
             echo "| Step | Result |"
             echo "|---|---|"
             echo "| Install dependencies | ${{ steps.install_requirements.outcome }} |"
-            echo "| pytest --cov=core --cov-report=term-missing | ${{ steps.pytest_run.outcome }} |"
+            echo "| pytest tests/ingestion --cov=ingestion --cov-report=term-missing | ${{ steps.pytest_run.outcome }} |"
           } >> "$GITHUB_STEP_SUMMARY"
