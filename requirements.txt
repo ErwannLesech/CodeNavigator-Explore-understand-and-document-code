@@ -16,7 +16,7 @@ mistralai==1.2.6
 
 # Utilitaires
 python-dotenv==1.0.1
-pydantic==2.7.0
+pydantic>=2.9.0,<3.0.0
 rich==13.7.1
 
 networkx
