@@ -1,22 +1,93 @@
-from pathlib import Path
-
-from ingestion.python_parser import parse_python_file
-from ingestion.repo_walker import walk_repo
+import argparse
+from embedding.indexer import run_indexing
+from generation.assembler import build_project_doc
+from generation.doc_generator import DocGenerator
+from generation.exporter import export_to_markdown
 from rich import print
 
+from ingestion.repo_walker import walk_repo
+from ingestion.parser_dispatcher import dispatch_parser
+from graph.builder import GraphBuilder
+from graph.mermaid_exporter import export_all_diagrams
+from graph.json_exporter import export_graph_json
 
-def main() -> None:
-    repo_path = Path("./data/input/sample_repo")
+from rag.cli import run_chat_cli
 
-    for source_file in walk_repo(repo_path):
-        print(f"[blue]{source_file.relative_path}[/blue] ({source_file.language})")
 
-        if source_file.language == "python":
-            info = parse_python_file(source_file.content, source_file.relative_path)
-            print(f"  Imports: {len(info.imports)}")
-            print(f"  Fonctions: {[f.name for f in info.functions]}")
-            print(f"  Classes: {[c.name for c in info.classes]}")
 
+def main():
+    parser = argparse.ArgumentParser(description="CodeNavigator CLI")
+    subparsers = parser.add_subparsers(dest="command")
+
+    # Commande index
+    idx = subparsers.add_parser("index", help="Parser et indexer une codebase")
+    idx.add_argument("--repo", required=True)
+    idx.add_argument("--dry-run", action="store_true")
+    idx.add_argument("--recreate", action="store_true")
+    idx.add_argument("--dialect", default="ansi")
+
+    # Commande generate
+    gen = subparsers.add_parser("generate", help="Generer la documentation")
+    gen.add_argument("--repo", required=True)
+    gen.add_argument("--output", default="data/output/docs")
+    gen.add_argument("--dialect", default="ansi")
+
+    graph_cmd = subparsers.add_parser("graph", help="Construire le knowledge graph")
+    graph_cmd.add_argument("--repo", required=True)
+    graph_cmd.add_argument("--output", default="data/output/graph")
+    graph_cmd.add_argument("--dialect", default="ansi")
+
+    # Commande full (index + generate)
+    full = subparsers.add_parser("full", help="Pipeline complet")
+    full.add_argument("--repo", required=True)
+    full.add_argument("--output", default="data/output/docs")
+    full.add_argument("--recreate", action="store_true")
+    full.add_argument("--dialect", default="ansi")
+
+    chat_cmd = subparsers.add_parser("chat", help="Lancer le chatbot RAG en CLI")
+    chat_cmd.add_argument("--graph", default="data/output/graph/graph.json")
+
+    args = parser.parse_args()
+
+    if args.command == "index":
+        run_indexing(args.repo, recreate_collection=args.recreate,
+                     sql_dialect=args.dialect, dry_run=args.dry_run)
+
+    elif args.command == "generate":
+        chunks = run_indexing(args.repo, sql_dialect=args.dialect, dry_run=True)
+        generator = DocGenerator()
+        project_doc = build_project_doc(chunks, generator)
+        files = export_to_markdown(project_doc, args.output)
+        print(f"[green]{len(files)} fichiers generes dans {args.output}[/green]")
+
+    elif args.command == "graph":
+        files = list(walk_repo(args.repo))
+        parsed_files = [dispatch_parser(f, sql_dialect=args.dialect) for f in files]
+
+        builder = GraphBuilder()
+        builder.ingest(parsed_files)
+
+        nodes = builder.get_nodes()
+        edges = builder.get_edges()
+
+        diagrams = export_all_diagrams(nodes, edges, output_dir=args.output)
+        export_graph_json(nodes, edges, output_path=f"{args.output}/graph.json")
+
+        print(f"[green]{len(nodes)} noeuds, {len(edges)} aretes[/green]")
+        print(f"[green]{len(diagrams)} diagrammes generes dans {args.output}[/green]")
+
+    elif args.command == "full":
+        chunks = run_indexing(args.repo, recreate_collection=args.recreate,
+                              sql_dialect=args.dialect)
+        generator = DocGenerator()
+        project_doc = build_project_doc(chunks, generator)
+        files = export_to_markdown(project_doc, args.output)
+        print(f"[green]Pipeline complet termine. {len(files)} fichiers dans {args.output}[/green]")
+
+    
+    elif args.command == "chat":
+        run_chat_cli(graph_json_path=args.graph)
+    
 
 if __name__ == "__main__":
     main()

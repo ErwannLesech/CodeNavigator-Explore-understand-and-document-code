@@ -1,17 +1,16 @@
-# CodeLens
+# CodeNavigator
 
 AI-powered codebase documentation engine: AST parsing, LLM doc generation, knowledge graph, SQL lineage and RAG chatbot. MCP-ready.
 
 ## Project Structure
 
 ```text
-CodeLens/
+CodeNavigator/
 |- ingestion/          # Parsing AST (tree-sitter, sqlglot)
 |- embedding/          # Chunking + vectorisation + Qdrant
 |- generation/         # Prompts LLM + generation doc
 |- graph/              # Knowledge graph NetworkX + Mermaid exports
 |- rag/                # Pipeline RAG + chatbot
-|- mcp_server/         # MCP server (final phase)
 |- api/                # FastAPI layer
 |- tests/
 |- data/
