@@ -1,12 +1,11 @@
 # ingestion/treesitter_parser.py
 from dataclasses import dataclass, field
-from typing import Optional, Any
-from pathlib import Path
+from typing import Optional
 
 # tree-sitter-languages est un bundle qui évite de compiler les grammaires manuellement
 # pip install tree-sitter==0.21.3 tree-sitter-languages==1.10.2
 try:
-    from tree_sitter_languages import get_language, get_parser
+    from tree_sitter_languages import get_parser
     TREESITTER_AVAILABLE = True
 except ImportError:
     TREESITTER_AVAILABLE = False
@@ -187,6 +186,6 @@ def parse_with_treesitter(source: str, language: str, source_file: str) -> Optio
             units=units,
             raw_tree_summary=f"root: {tree.root_node.type}, children: {len(tree.root_node.children)}"
         )
-    except Exception as e:
+    except Exception:
         # Ne pas faire crasher le pipeline si un fichier pose problème
         return None

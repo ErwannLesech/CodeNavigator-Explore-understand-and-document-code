@@ -1,9 +1,8 @@
 # ingestion/sql_parser.py
 import sqlglot
 import sqlglot.expressions as exp
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
-from pathlib import Path
 
 
 @dataclass
@@ -157,7 +156,7 @@ def parse_sql_file(source: str, file_path: str, dialect: str = "ansi") -> SqlFil
 
     try:
         statements = sqlglot.parse(source, dialect=dialect, error_level=sqlglot.ErrorLevel.WARN)
-    except Exception as e:
+    except Exception:
         # En cas d'erreur fatale, on retourne un résultat vide plutôt que de crasher
         return SqlFileInfo(schemas=[], queries=[], source_file=file_path)
 
