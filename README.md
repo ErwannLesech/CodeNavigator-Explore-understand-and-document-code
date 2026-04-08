@@ -1,37 +1,55 @@
 # CodeNavigator
 
-CodeNavigator est un outil d'exploration de codebase et de generation de
-documentation assistee par IA (parsing multi-langages, extraction de structure,
-export Markdown, contexte graphe, RAG).
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Mistral](https://img.shields.io/badge/LLM-Mistral-black)](https://mistral.ai/)
+[![Qdrant](https://img.shields.io/badge/Vector%20DB-Qdrant-E74C3C?logo=qdrant&logoColor=white)](https://qdrant.tech/)
+[![NetworkX](https://img.shields.io/badge/Graph-NetworkX-0C6EFD)](https://networkx.org/)
+[![Tree-sitter](https://img.shields.io/badge/Parser-Tree--sitter-3C873A)](https://tree-sitter.github.io/tree-sitter/)
+[![SQLGlot](https://img.shields.io/badge/SQL-SQLGlot-4B5563)](https://github.com/tobymao/sqlglot)
 
-Ce README decrit l'etat reel du projet au 2026-04-08.
+CodeNavigator est un outil d'exploration de code qui automatise:
 
-## Etat actuel (resume)
+- l'ingestion d'un depot (Python, SQL, JS, TS),
+- le parsing structurel (fonctions, classes, schemas SQL, dependances),
+- la generation de documentation Markdown assistee par IA,
+- la construction d'un graphe de connaissances,
+- un chatbot RAG pour interroger la codebase en langage naturel.
 
-- Ingestion: operationnelle (repo walker + parser Python + parser SQL + fallback
-   tree-sitter).
-- Generation de docs: code present et fonctionnel, avec appels Mistral.
-- RAG chatbot: code present (CLI + route API), avec retrieval et contexte graphe.
-- Embedding et graph build/index pipeline: references dans le CLI, mais modules
-   manquants dans ce workspace (dossiers `embedding/` et `graph/` incomplets).
-- Tests: presents sur ingestion uniquement.
-- Artefacts de sortie: documentation et graph deja generes dans `data/output/`.
+## Fonctionnalites
 
-## Structure actuelle du repo
+- Ingestion de depot local ou distant (via clone Git).
+- Parsing specialise Python et SQL + fallback Tree-sitter.
+- Chunking et indexation vectorielle pour la recherche semantique.
+- Generation de docs projet/modules/fichiers au format Markdown.
+- Export de graphes en JSON et diagrammes Mermaid.
+- Chat RAG en CLI et endpoint FastAPI reutilisable.
+
+## Structure du projet
 
 ```text
 CodeNavigator/
 |- api/
 |  `- chat.py
+|- embedding/
+|  |- chunker.py
+|  |- embedder.py
+|  |- indexer.py
+|  `- vector_store.py
 |- generation/
 |  |- assembler.py
 |  |- doc_generator.py
 |  |- exporter.py
 |  `- prompts.py
+|- graph/
+|  |- builder.py
+|  |- json_exporter.py
+|  |- mermaid_exporter.py
+|  `- models.py
 |- ingestion/
-|  |- repo_walker.py
 |  |- parser_dispatcher.py
 |  |- python_parser.py
+|  |- repo_walker.py
 |  |- sql_parser.py
 |  `- treesitter_parser.py
 |- rag/
@@ -48,85 +66,164 @@ CodeNavigator/
 `- requirements.txt
 ```
 
-## Ce qui fonctionne deja
+## Prerequis
 
-### 1) Ingestion
+- Python 3.11+
+- pip
+- Cle API Mistral (obligatoire pour generation et chat)
+- Qdrant (obligatoire pour indexation vectorielle et RAG)
 
-- `ingestion/repo_walker.py`
-   - Parcourt un repo local ou clone un repo Git URL.
-   - Filtre les extensions supportees (`.py`, `.sql`, `.js`, `.ts`).
-   - Ignore les dossiers techniques (`.venv`, `node_modules`, `.git`, etc.).
-- `ingestion/python_parser.py`
-   - Extrait imports, fonctions top-level, classes, methodes, docstrings, lignes.
-- `ingestion/sql_parser.py`
-   - Parse schemas/table definitions et requetes (lineage lecture/ecriture,
-      colonnes, joins) via `sqlglot`.
-- `ingestion/treesitter_parser.py`
-   - Extraction generique pour JS/TS/Python quand tree-sitter est disponible.
-- `ingestion/parser_dispatcher.py`
-   - Route automatiquement vers le parser adapte selon le langage.
-
-### 2) Generation Markdown (LLM)
-
-- `generation/doc_generator.py`
-   - Utilise l'API Mistral (`MISTRAL_API_KEY` requise).
-- `generation/assembler.py`
-   - Assemble docs fonctions/classes/tables + synthese module/projet.
-- `generation/exporter.py`
-   - Exporte en Markdown (`README.md`, `INDEX.md`, docs par module).
-
-### 3) RAG (chat)
-
-- CLI: `rag/cli.py`
-- Bot conversationnel: `rag/chatbot.py`
-- Route FastAPI: `api/chat.py`
-- Contexte graphe: `rag/graph_context.py`
-
-## Limitations connues dans ce workspace
-
-- `main.py` importe:
-   - `embedding.indexer`
-   - `graph.builder`
-   - `graph.mermaid_exporter`
-   - `graph.json_exporter`
-- Ces modules ne sont pas presents actuellement dans les dossiers
-   `embedding/` et `graph/` (qui contiennent seulement `__pycache__/`).
-- Consequence: certaines commandes CLI declarees dans `main.py` ne sont pas
-   executables telles quelles tant que ces modules ne sont pas restaures.
-
-## Commandes CLI ciblees (quand tous les modules sont presents)
+Option recommande pour Qdrant (Docker):
 
 ```bash
-python main.py index --repo <path-ou-git-url>
-python main.py generate --repo <path-ou-git-url>
-python main.py graph --repo <path-ou-git-url>
-python main.py full --repo <path-ou-git-url>
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+## Installation
+
+1. Cloner le depot
+
+```bash
+git clone <url-du-repo>
+cd CodeNavigator-Explore-understand-and-document-code
+```
+
+2. Creer et activer un environnement virtuel
+
+Windows (PowerShell):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Linux / macOS:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+3. Installer les dependances
+
+```bash
+pip install -r requirements.txt
+```
+
+4. Installer Qdrant client (necessaire a l'indexation)
+
+```bash
+pip install qdrant-client==1.9.1
+```
+
+## Configuration
+
+Creer un fichier .env a la racine:
+
+```env
+MISTRAL_API_KEY=your_mistral_api_key
+GRAPH_JSON_PATH=data/output/graph/graph.json
+```
+
+## Utilisation CLI
+
+La CLI principale est dans main.py.
+
+### 1) Indexer une codebase
+
+```bash
+python main.py index --repo <path_ou_git_url>
+```
+
+Mode validation sans appels embeddings:
+
+```bash
+python main.py index --repo <path_ou_git_url> --dry-run
+```
+
+### 2) Generer la documentation Markdown
+
+```bash
+python main.py generate --repo <path_ou_git_url> --output data/output/docs
+```
+
+### 3) Generer le knowledge graph
+
+```bash
+python main.py graph --repo <path_ou_git_url> --output data/output/graph
+```
+
+### 4) Lancer le pipeline complet
+
+```bash
+python main.py full --repo <path_ou_git_url> --output data/output/docs
+```
+
+### 5) Lancer le chatbot RAG en CLI
+
+```bash
 python main.py chat --graph data/output/graph/graph.json
 ```
 
+Commandes utiles dans le chat:
+
+- /sources : activer/desactiver l'affichage des sources
+- /reset : vider l'historique
+- /quit : quitter
+
+## Exemples rapides
+
+Utiliser le repo d'exemple fourni:
+
+```bash
+python main.py graph --repo data/input/sample_repo --output data/output/graph
+python main.py generate --repo data/input/sample_repo --output data/output/docs
+python main.py chat --graph data/output/graph/graph.json
+```
+
+## Endpoint API Chat (FastAPI)
+
+Le routeur est defini dans api/chat.py (prefixe /api/chat).
+
+Exemple d'integration:
+
+```python
+from fastapi import FastAPI
+from api.chat import router as chat_router
+
+app = FastAPI(title="CodeNavigator API")
+app.include_router(chat_router)
+```
+
+Endpoints exposes:
+
+- POST /api/chat
+- DELETE /api/chat/reset
+
 ## Tests
 
-- Jeux de tests disponibles: `tests/ingestion/`
-   - `test_repo_walker.py`
-   - `test_python_parser.py`
-   - `test_sql_parser.py`
-   - `test_parser_dispatcher.py`
-- Pas de tests automatises visibles pour `generation/`, `rag/` et `api/` dans
-   l'etat actuel.
+Executer la suite de tests:
 
-## Dependances principales
+```bash
+pytest -q
+```
 
-- Parsing: `tree-sitter`, `tree-sitter-languages`, `sqlglot`, `gitpython`
-- LLM: `mistralai`
-- API/config: `pydantic`, `python-dotenv`
-- CLI output: `rich`
-- Graph (declare): `networkx`
+Les tests actuels couvrent principalement le module ingestion.
 
-## Roadmap recommandee (prochaines etapes)
+## Sorties generees
 
-1. Restaurer/ajouter les modules `embedding/*` et `graph/*` manquants pour
-    rendre `main.py` executable end-to-end.
-2. Ajouter des tests sur `generation/`, `rag/` et `api/chat.py`.
-3. Ajouter un mode de verification locale (sans appel LLM) pour valider le
-    pipeline en CI.
-4. Documenter un workflow de demarrage unique (env vars + commandes minimales).
+- Documentation: data/output/docs/
+- Graphe et diagrammes: data/output/graph/
+- Index vectoriel local (Qdrant): data/qdrant_local/
+
+## Depannage
+
+- Erreur MISTRAL_API_KEY: verifier la variable d'environnement dans .env.
+- Erreur de connexion Qdrant: verifier que Qdrant tourne sur localhost:6333.
+- Aucun resultat RAG: lancer d'abord index ou full, puis regenerer le graphe si necessaire.
+
+## Roadmap suggeree
+
+- Etendre la couverture de tests (generation, rag, api).
+- Ajouter un serveur API pret a lancer dans le repo (point d'entree uvicorn).
+- Ajouter un mode local/mock sans appel LLM pour CI.
