@@ -283,3 +283,4 @@ class GraphBuilder:
 
     def get_edges(self) -> list[Edge]:
         return self._edges
+
