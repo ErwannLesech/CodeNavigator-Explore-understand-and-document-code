@@ -112,10 +112,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           if [ -f requirements.txt ]; then
-            cat > constraints-ci.txt << 'EOF'
-            pydantic>=2.9.0,<3.0.0
-            mistralai==1.2.6
-            EOF
+            printf '%s\n' 'pydantic>=2.9.0,<3.0.0' 'mistralai==1.2.6' > constraints-ci.txt
             pip install -r requirements.txt -c constraints-ci.txt
           else
             echo "requirements.txt not found, skipping dependency installation."
