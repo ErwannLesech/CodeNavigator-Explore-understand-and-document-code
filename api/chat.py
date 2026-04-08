@@ -59,3 +59,4 @@ def chat(request: ChatRequest):
 def reset_chat():
     get_chatbot().reset()
     return {"status": "ok"}
+
