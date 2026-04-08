@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+  push:
+    branches:
+      - dev
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11 with pip cache
+        id: setup_python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+
+
+      - name: Install ruff and bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff bandit
+
+      - name: Run ruff checks
+        id: ruff_check
+        run: ruff check .
+
+      - name: Check formatting with ruff
+        id: ruff_format
+        run: ruff format --check .
+
+      - name: Run bandit security scan (medium+)
+        id: bandit_scan
+        run: bandit -r backend src tests .github/scripts -ll --exclude ./.git,./notebooks,./data,./.venv,./frontend,./node_modules
+
+      - name: Write code-quality summary
+        if: always()
+        run: |
+          {
+            echo "## Code Quality Summary"
+            echo ""
+            echo "| Tool | Result |"
+            echo "|---|---|"
+            echo "| ruff check | ${{ steps.ruff_check.outcome }} |"
+            echo "| ruff format --check | ${{ steps.ruff_format.outcome }} |"
+            echo "| bandit -r backend src tests .github/scripts -ll | ${{ steps.bandit_scan.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  business-logic-tests:
+    name: Business Logic Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11 with pip cache
+        id: setup_python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ steps.setup_python.outputs.python-version }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ steps.setup_python.outputs.python-version }}-
+            ${{ runner.os }}-pip-
+
+      # Test structure guidance:
+      # - Put tests in the tests/ directory.
+      # - Use file names that match test_*.py so pytest can discover them automatically.
+      #
+      # Mocking external API calls in tests (no real network calls in CI):
+      # Example:
+      # from unittest.mock import patch
+      #
+      # @patch("integrations.github.requests.get")
+      # def test_fetch_data(mock_get):
+      #     mock_get.return_value.status_code = 200
+      #     mock_get.return_value.json.return_value = {"ok": True}
+      #     # call your function and assert behavior
+
+      - name: Install project dependencies (if requirements.txt exists)
+        id: install_requirements
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            echo "requirements.txt not found, skipping dependency installation."
+          fi
+
+      - name: Install test dependencies
+        run: pip install pytest pytest-cov
+
+      - name: Run pytest with coverage
+        id: pytest_run
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: pytest --cov=core --cov-report=term-missing
+
+      - name: Write test summary
+        if: always()
+        run: |
+          {
+            echo "## Business Logic Tests Summary"
+            echo ""
+            echo "| Step | Result |"
+            echo "|---|---|"
+            echo "| Install dependencies | ${{ steps.install_requirements.outcome }} |"
+            echo "| pytest --cov=core --cov-report=term-missing | ${{ steps.pytest_run.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
