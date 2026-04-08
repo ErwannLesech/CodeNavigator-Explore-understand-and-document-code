@@ -14,7 +14,6 @@ from graph.json_exporter import export_graph_json
 from rag.cli import run_chat_cli
 
 
-
 def main():
     parser = argparse.ArgumentParser(description="CodeNavigator CLI")
     subparsers = parser.add_subparsers(dest="command")
@@ -50,8 +49,12 @@ def main():
     args = parser.parse_args()
 
     if args.command == "index":
-        run_indexing(args.repo, recreate_collection=args.recreate,
-                     sql_dialect=args.dialect, dry_run=args.dry_run)
+        run_indexing(
+            args.repo,
+            recreate_collection=args.recreate,
+            sql_dialect=args.dialect,
+            dry_run=args.dry_run,
+        )
 
     elif args.command == "generate":
         chunks = run_indexing(args.repo, sql_dialect=args.dialect, dry_run=True)
@@ -77,17 +80,19 @@ def main():
         print(f"[green]{len(diagrams)} diagrammes generes dans {args.output}[/green]")
 
     elif args.command == "full":
-        chunks = run_indexing(args.repo, recreate_collection=args.recreate,
-                              sql_dialect=args.dialect)
+        chunks = run_indexing(
+            args.repo, recreate_collection=args.recreate, sql_dialect=args.dialect
+        )
         generator = DocGenerator()
         project_doc = build_project_doc(chunks, generator)
         files = export_to_markdown(project_doc, args.output)
-        print(f"[green]Pipeline complet termine. {len(files)} fichiers dans {args.output}[/green]")
+        print(
+            f"[green]Pipeline complet termine. {len(files)} fichiers dans {args.output}[/green]"
+        )
 
-    
     elif args.command == "chat":
         run_chat_cli(graph_json_path=args.graph)
-    
+
 
 if __name__ == "__main__":
     main()

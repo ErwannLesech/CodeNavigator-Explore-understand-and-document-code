@@ -59,7 +59,9 @@ def walk_repo(root: str | Path) -> Iterator[SourceFile]:
 
 def _walk_local_repo(root: Path) -> Iterator[SourceFile]:
     if not root.exists() or not root.is_dir():
-        raise ValueError(f"Repository path does not exist or is not a directory: {root}")
+        raise ValueError(
+            f"Repository path does not exist or is not a directory: {root}"
+        )
 
     for file_path in sorted(root.rglob("*")):
         if not file_path.is_file():

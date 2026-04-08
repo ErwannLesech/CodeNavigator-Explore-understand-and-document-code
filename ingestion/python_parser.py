@@ -94,9 +94,11 @@ def parse_python_file(source: str, module_name: str) -> ModuleInfo:
             docstring=ast.get_docstring(tree),
             module_name=module_name,
         )
-        logger.debug(f"Python parse complete for {module_name}: {len(functions)} functions, {len(classes)} classes")
+        logger.debug(
+            f"Python parse complete for {module_name}: {len(functions)} functions, {len(classes)} classes"
+        )
         return result
-    
+
     except Exception as e:
         logger.error(f"Error parsing Python file {module_name}: {e}", exc_info=True)
         raise

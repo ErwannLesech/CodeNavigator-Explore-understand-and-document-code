@@ -20,7 +20,7 @@ class ColumnRef:
 
 @dataclass
 class QueryInfo:
-    query_type: str          # SELECT, INSERT, UPDATE, CREATE, etc.
+    query_type: str  # SELECT, INSERT, UPDATE, CREATE, etc.
     tables_read: list[TableRef]
     tables_written: list[TableRef]
     columns_referenced: list[ColumnRef]
@@ -32,9 +32,13 @@ class QueryInfo:
 @dataclass
 class TableSchema:
     name: str
-    columns: list[dict]      # {"name": str, "type": str, "nullable": bool, "primary_key": bool}
+    columns: list[
+        dict
+    ]  # {"name": str, "type": str, "nullable": bool, "primary_key": bool}
     primary_keys: list[str]
-    foreign_keys: list[dict] # {"column": str, "references_table": str, "references_column": str}
+    foreign_keys: list[
+        dict
+    ]  # {"column": str, "references_table": str, "references_column": str}
     lineno: Optional[int] = None
 
 
@@ -49,7 +53,7 @@ def _extract_table_ref(table_expr) -> TableRef:
     return TableRef(
         name=table_expr.name,
         alias=table_expr.alias or None,
-        schema=table_expr.db or None
+        schema=table_expr.db or None,
     )
 
 
@@ -79,12 +83,14 @@ def _parse_create_table(stmt) -> Optional[TableSchema]:
         if is_pk:
             primary_keys.append(col_name)
 
-        columns.append({
-            "name": col_name,
-            "type": col_type_str,
-            "nullable": not not_null and not is_pk,
-            "primary_key": is_pk
-        })
+        columns.append(
+            {
+                "name": col_name,
+                "type": col_type_str,
+                "nullable": not not_null and not is_pk,
+                "primary_key": is_pk,
+            }
+        )
 
     # Clés étrangères déclarées en contrainte de table
     for fk in stmt.find_all(exp.ForeignKey):
@@ -94,17 +100,19 @@ def _parse_create_table(stmt) -> Optional[TableSchema]:
             ref_table = ref.find(exp.Table)
             ref_cols = [c.name for c in ref.find_all(exp.Column)]
             for fc, rc in zip(fk_cols, ref_cols):
-                foreign_keys.append({
-                    "column": fc,
-                    "references_table": ref_table.name if ref_table else "unknown",
-                    "references_column": rc
-                })
+                foreign_keys.append(
+                    {
+                        "column": fc,
+                        "references_table": ref_table.name if ref_table else "unknown",
+                        "references_column": rc,
+                    }
+                )
 
     return TableSchema(
         name=table_name.name,
         columns=columns,
         primary_keys=primary_keys,
-        foreign_keys=foreign_keys
+        foreign_keys=foreign_keys,
     )
 
 
@@ -142,7 +150,7 @@ def _parse_query(stmt) -> QueryInfo:
         tables_written=tables_written,
         columns_referenced=columns,
         joins=joins,
-        raw_sql=stmt.sql()
+        raw_sql=stmt.sql(),
     )
 
 
@@ -155,7 +163,9 @@ def parse_sql_file(source: str, file_path: str, dialect: str = "ansi") -> SqlFil
     queries = []
 
     try:
-        statements = sqlglot.parse(source, dialect=dialect, error_level=sqlglot.ErrorLevel.WARN)
+        statements = sqlglot.parse(
+            source, dialect=dialect, error_level=sqlglot.ErrorLevel.WARN
+        )
     except Exception:
         # En cas d'erreur fatale, on retourne un résultat vide plutôt que de crasher
         return SqlFileInfo(schemas=[], queries=[], source_file=file_path)
@@ -167,7 +177,9 @@ def parse_sql_file(source: str, file_path: str, dialect: str = "ansi") -> SqlFil
             schema = _parse_create_table(stmt)
             if schema:
                 schemas.append(schema)
-        elif isinstance(stmt, (exp.Select, exp.Insert, exp.Update, exp.Delete, exp.Merge)):
+        elif isinstance(
+            stmt, (exp.Select, exp.Insert, exp.Update, exp.Delete, exp.Merge)
+        ):
             queries.append(_parse_query(stmt))
 
     return SqlFileInfo(schemas=schemas, queries=queries, source_file=file_path)
