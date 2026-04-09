@@ -28,7 +28,9 @@ class Embedder:
         for i in range(0, len(chunks), BATCH_SIZE):
             batch = chunks[i : i + BATCH_SIZE]
             texts = [c.content for c in batch]
-            response = self.client.embeddings.create(model=EMBEDDING_MODEL, inputs=texts)
+            response = self.client.embeddings.create(
+                model=EMBEDDING_MODEL, inputs=texts
+            )
             if response is None or response.data is None:
                 raise RuntimeError("Embedding API returned an empty response")
             batch_embeddings = [item.embedding for item in response.data]

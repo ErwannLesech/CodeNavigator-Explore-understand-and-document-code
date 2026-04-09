@@ -12,6 +12,7 @@ from generation.prompts import (
     prompt_for_project,
 )
 
+
 class DocGenerator:
     def __init__(self, model: str = "mistral-large-latest", delay: float = 0.3):
         api_key = os.getenv("MISTRAL_API_KEY")
