@@ -74,7 +74,7 @@ def _walk_local_repo(root: Path) -> Iterator[SourceFile]:
             continue
 
         try:
-            content = file_path.read_text(encoding="utf-8", errors="ignore")
+            content = file_path.read_text(encoding="utf-8-sig", errors="ignore")
         except OSError:
             continue
 

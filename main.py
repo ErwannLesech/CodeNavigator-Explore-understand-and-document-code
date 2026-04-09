@@ -23,25 +23,25 @@ def main():
     idx.add_argument("--repo", required=True)
     idx.add_argument("--dry-run", action="store_true")
     idx.add_argument("--recreate", action="store_true")
-    idx.add_argument("--dialect", default="ansi")
+    idx.add_argument("--dialect", default="mysql")
 
     # Commande generate
     gen = subparsers.add_parser("generate", help="Generer la documentation")
     gen.add_argument("--repo", required=True)
     gen.add_argument("--output", default="data/output/docs")
-    gen.add_argument("--dialect", default="ansi")
+    gen.add_argument("--dialect", default="mysql")
 
     graph_cmd = subparsers.add_parser("graph", help="Construire le knowledge graph")
     graph_cmd.add_argument("--repo", required=True)
     graph_cmd.add_argument("--output", default="data/output/graph")
-    graph_cmd.add_argument("--dialect", default="ansi")
+    graph_cmd.add_argument("--dialect", default="mysql")
 
     # Commande full (index + generate)
     full = subparsers.add_parser("full", help="Pipeline complet")
     full.add_argument("--repo", required=True)
     full.add_argument("--output", default="data/output/docs")
     full.add_argument("--recreate", action="store_true")
-    full.add_argument("--dialect", default="ansi")
+    full.add_argument("--dialect", default="mysql")
 
     chat_cmd = subparsers.add_parser("chat", help="Lancer le chatbot RAG en CLI")
     chat_cmd.add_argument("--graph", default="data/output/graph/graph.json")
