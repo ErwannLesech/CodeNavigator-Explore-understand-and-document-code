@@ -229,4 +229,3 @@ def chunk_parsed_file(parsed: ParsedFile) -> list[Chunk]:
     except Exception as e:
         logger.error(f"Error chunking file {file_path}: {e}", exc_info=True)
         raise
-

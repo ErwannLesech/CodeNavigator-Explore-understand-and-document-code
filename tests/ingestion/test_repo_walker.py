@@ -23,3 +23,14 @@ def test_walk_repo_filters_by_extension_and_ignored_dirs(tmp_path: Path) -> None
     language_map = {f.relative_path.replace("\\", "/"): f.language for f in files}
     assert language_map["ingestion/a.py"] == "python"
     assert language_map["queries.sql"] == "sql"
+
+
+def test_walk_repo_strips_utf8_bom_from_python_files(tmp_path: Path) -> None:
+    file_path = tmp_path / "bom_file.py"
+    file_path.write_bytes("\ufeffimport logging\n".encode("utf-8"))
+
+    files = list(walk_repo(tmp_path))
+
+    assert len(files) == 1
+    assert files[0].relative_path == "bom_file.py"
+    assert files[0].content.startswith("import logging")
