@@ -2,13 +2,6 @@ from pathlib import Path
 from generation.assembler import ProjectDoc
 
 
-AI_DISCLAIMER = (
-    "> **Note** : cette documentation a ete generee automatiquement par IA (CodeNavigator). "
-    "Elle peut contenir des inexactitudes. Une relecture humaine est recommandee "
-    "pour les sections critiques.\n\n"
-)
-
-
 def export_to_markdown(project_doc: ProjectDoc, output_dir: str) -> list[Path]:
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -16,7 +9,7 @@ def export_to_markdown(project_doc: ProjectDoc, output_dir: str) -> list[Path]:
 
     # README.md projet
     readme = out / "README.md"
-    readme.write_text(AI_DISCLAIMER + project_doc.project_overview, encoding="utf-8")
+    readme.write_text(project_doc.project_overview, encoding="utf-8")
     written.append(readme)
 
     # Un fichier par module
@@ -33,7 +26,7 @@ def export_to_markdown(project_doc: ProjectDoc, output_dir: str) -> list[Path]:
         )
         module_file = modules_dir / f"{safe_name}.md"
 
-        sections = [AI_DISCLAIMER, module.module_doc, "\n---\n"]
+        sections = [module.module_doc, "\n---\n"]
 
         if module.function_docs:
             sections.append("## Functions & Methods\n")
@@ -56,7 +49,7 @@ def export_to_markdown(project_doc: ProjectDoc, output_dir: str) -> list[Path]:
     # Index global des modules
     index = out / "INDEX.md"
     index_lines = [
-        AI_DISCLAIMER,
+        ,
         "# Documentation Index\n\n| Module | Link |\n|--------|------|\n",
     ]
     for module in project_doc.modules:
