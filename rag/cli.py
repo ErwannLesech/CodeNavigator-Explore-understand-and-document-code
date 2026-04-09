@@ -2,10 +2,11 @@
 from rich import print
 from rich.panel import Panel
 from rich.prompt import Prompt
+from typing import Optional
 from rag.chatbot import CodeNavigatorChatbot
 
 
-def run_chat_cli(graph_json_path: str = None):
+def run_chat_cli(graph_json_path: Optional[str] = None):
     print(
         Panel.fit(
             "[bold blue]CodeNavigator[/bold blue] — Chatbot RAG\n"

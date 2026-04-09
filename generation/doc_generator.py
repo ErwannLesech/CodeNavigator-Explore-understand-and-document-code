@@ -1,6 +1,6 @@
 import os
 import time
-import logging
+from typing import Optional
 from mistralai import Mistral
 from embedding.chunker import Chunk
 from generation.prompts import (
@@ -11,9 +11,6 @@ from generation.prompts import (
     prompt_for_module,
     prompt_for_project,
 )
-
-logger = logging.getLogger(__name__)
-
 
 class DocGenerator:
     def __init__(self, model: str = "mistral-large-latest", delay: float = 0.3):
@@ -27,7 +24,6 @@ class DocGenerator:
         self.model = model
         self.delay = delay  # délai entre les appels pour éviter le rate limit
         self._call_count = 0
-        logger.info(f"DocGenerator initialized with model: {self.model}")
 
     def _call(self, prompt: str, max_tokens: int = 1024) -> str:
         self._call_count += 1
@@ -42,13 +38,25 @@ class DocGenerator:
                 {"role": "user", "content": prompt},
             ],
         )
-        return response.choices[0].message.content
+        if response is None or response.choices is None or not response.choices:
+            raise RuntimeError("LLM API returned an empty response")
+
+        content = response.choices[0].message.content
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            return "\n".join(getattr(item, "text", str(item)) for item in content)
+        if content is None:
+            raise RuntimeError("LLM API returned empty content")
+        return str(content)
 
     def document_function(self, chunk: Chunk) -> str:
         return self._call(prompt_for_function(chunk))
 
-    def document_class(self, chunk: Chunk, method_docs: list[str] = None) -> str:
-        return self._call(prompt_for_class(chunk, method_docs), max_tokens=1500)
+    def document_class(
+        self, chunk: Chunk, method_docs: Optional[list[str]] = None
+    ) -> str:
+        return self._call(prompt_for_class(chunk, method_docs or []), max_tokens=1500)
 
     def document_table(self, chunk: Chunk) -> str:
         return self._call(prompt_for_table(chunk))

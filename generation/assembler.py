@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from collections import defaultdict
-from rich import print
-from rich.progress import track
 
 from embedding.chunker import Chunk
 from generation.doc_generator import DocGenerator
@@ -40,11 +38,7 @@ def build_project_doc(chunks: list[Chunk], generator: DocGenerator) -> ProjectDo
     grouped = _group_chunks_by_file(chunks)
     module_docs = []
 
-    print(f"[blue]Generation de documentation pour {len(grouped)} fichiers...[/blue]")
-
-    for file_path, file_chunks in track(
-        grouped.items(), description="Documenting modules..."
-    ):
+    for file_path, file_chunks in grouped.items():
         # Trier les chunks par type pour respecter l'ordre de génération
         functions = [c for c in file_chunks if c.chunk_type == "function"]
         methods = [c for c in file_chunks if c.chunk_type == "method"]
@@ -110,7 +104,6 @@ def build_project_doc(chunks: list[Chunk], generator: DocGenerator) -> ProjectDo
         )
 
     # 6. Vue projet globale
-    print("[blue]Generation de la vue projet globale...[/blue]")
     modules_summary = [
         {
             "file": m.file_path,

@@ -1,6 +1,7 @@
 # rag/chatbot.py
 import os
 from dataclasses import dataclass
+from typing import Optional
 from mistralai import Mistral
 from rag.retriever import Retriever, RetrievedContext
 from rag.graph_context import GraphContextProvider
@@ -23,7 +24,7 @@ class ChatResponse:
 class CodeNavigatorChatbot:
     def __init__(
         self,
-        graph_json_path: str = None,
+        graph_json_path: Optional[str] = None,
         top_k: int = 6,
         model: str = "mistral-large-latest",
     ):
@@ -32,14 +33,19 @@ class CodeNavigatorChatbot:
         self.retriever = Retriever(top_k=top_k)
         self.history: list[Message] = []
 
-        self.graph_provider = None
-        if graph_json_path:
-            try:
-                self.graph_provider = GraphContextProvider(graph_json_path)
-            except Exception:
-                pass  # graph optionnel, ne bloque pas le chatbot
+        self.graph_provider = self._init_graph_provider(graph_json_path)
 
-    def _build_messages(self, user_prompt: str) -> list[dict]:
+    def _init_graph_provider(
+        self, graph_json_path: Optional[str]
+    ) -> Optional[GraphContextProvider]:
+        if not graph_json_path:
+            return None
+        try:
+            return GraphContextProvider(graph_json_path)
+        except Exception:
+            return None  # le graph est optionnel
+
+    def _build_messages(self, user_prompt: str) -> list[dict[str, str]]:
         """Construit l'historique de conversation pour l'API Mistral."""
         messages = [{"role": "system", "content": RAG_SYSTEM_PROMPT}]
 
@@ -53,9 +59,9 @@ class CodeNavigatorChatbot:
     def chat(
         self,
         query: str,
-        filter_language: str = None,
-        filter_type: str = None,
-        filter_file: str = None,
+        filter_language: Optional[str] = None,
+        filter_type: Optional[str] = None,
+        filter_file: Optional[str] = None,
     ) -> ChatResponse:
 
         # 1. Retrieval
@@ -79,10 +85,21 @@ class CodeNavigatorChatbot:
         messages = self._build_messages(user_prompt)
         response = self.client.chat.complete(
             model=self.model,
-            messages=messages,
+            messages=messages,  # type: ignore[arg-type]
             max_tokens=1500,
         )
-        answer = response.choices[0].message.content
+        if response is None or response.choices is None or not response.choices:
+            raise RuntimeError("LLM API returned an empty response")
+
+        content = response.choices[0].message.content
+        if isinstance(content, str):
+            answer = content
+        elif isinstance(content, list):
+            answer = "\n".join(getattr(item, "text", str(item)) for item in content)
+        elif content is None:
+            raise RuntimeError("LLM API returned empty content")
+        else:
+            answer = str(content)
 
         # 5. Mise à jour de l'historique
         # On stocke la question originale (pas le prompt enrichi) pour garder l'historique lisible

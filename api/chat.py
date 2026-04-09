@@ -3,11 +3,12 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from rag.chatbot import CodeNavigatorChatbot
 import os
+from typing import Optional
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 # Instance partagée — initialisée au démarrage de l'API
-_chatbot: CodeNavigatorChatbot = None
+_chatbot: Optional[CodeNavigatorChatbot] = None
 
 
 def get_chatbot() -> CodeNavigatorChatbot:
@@ -20,15 +21,19 @@ def get_chatbot() -> CodeNavigatorChatbot:
 
 class ChatRequest(BaseModel):
     query: str
-    filter_language: str = None
-    filter_type: str = None
-    filter_file: str = None
+    filter_language: Optional[str] = None
+    filter_type: Optional[str] = None
+    filter_file: Optional[str] = None
 
 
 class ChatResponseDTO(BaseModel):
     answer: str
     sources: list[dict]
     graph_context_used: bool
+
+
+class ResetResponseDTO(BaseModel):
+    status: str
 
 
 @router.post("", response_model=ChatResponseDTO)
@@ -55,7 +60,7 @@ def chat(request: ChatRequest):
     )
 
 
-@router.delete("/reset")
+@router.delete("/reset", response_model=ResetResponseDTO)
 def reset_chat():
     get_chatbot().reset()
-    return {"status": "ok"}
+    return ResetResponseDTO(status="ok")

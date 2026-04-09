@@ -10,10 +10,7 @@ from qdrant_client.models import (
 )
 from embedding.chunker import Chunk
 import uuid
-import logging
 from typing import Any, Iterable, Optional, cast
-
-logger = logging.getLogger(__name__)
 
 
 COLLECTION_NAME = "CodeNavigatorChunks"
@@ -23,33 +20,25 @@ VECTOR_SIZE = 1024  # text-embedding-3-small
 
 class VectorStore:
     def __init__(self, host: str = "localhost", port: int = 6333):
-        logger.info(f"Initializing VectorStore: {host}:{port}")
         self.client = QdrantClient(host=host, port=port)
-        logger.info("VectorStore client connected")
 
     def create_collection(self, recreate: bool = False):
-        logger.info(f"Creating collection: {COLLECTION_NAME} (recreate={recreate})")
         existing = [c.name for c in self.client.get_collections().collections]
 
         if COLLECTION_NAME in existing:
             if recreate:
-                logger.info(f"Deleting existing collection: {COLLECTION_NAME}")
                 self.client.delete_collection(COLLECTION_NAME)
             else:
-                logger.info(f"Collection already exists: {COLLECTION_NAME}")
                 return  # déjà existante, on ne touche pas
 
-        logger.info(f"Creating new collection with vector size {VECTOR_SIZE}")
         self.client.create_collection(
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
         )
-        logger.info(f"Collection {COLLECTION_NAME} created successfully")
 
     def upsert_chunks(self, chunks: list[Chunk], embeddings: list[list[float]]):
         """Insère ou met à jour des chunks avec leurs embeddings."""
         assert len(chunks) == len(embeddings)
-        logger.info(f"Upserting {len(chunks)} chunks to {COLLECTION_NAME}...")
 
         points = [
             PointStruct(
@@ -69,7 +58,6 @@ class VectorStore:
         ]
 
         self.client.upsert(collection_name=COLLECTION_NAME, points=points)
-        logger.info(f"Successfully upserted {len(points)} points to {COLLECTION_NAME}")
 
     def search(
         self,

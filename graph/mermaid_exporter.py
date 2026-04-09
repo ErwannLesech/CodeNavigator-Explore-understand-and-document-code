@@ -115,7 +115,6 @@ def generate_class_diagram(
         if edge.source in selected and edge.target in selected:
             src = _safe_id(edge.source)
             tgt = _safe_id(edge.target)
-            EDGE_LABELS.get(edge.edge_type, edge.edge_type.value)
             arrow = "-->" if edge.edge_type != EdgeType.INHERITS else "-.->|inherits|"
             lines.append(f"    {src} {arrow} {tgt}")
 

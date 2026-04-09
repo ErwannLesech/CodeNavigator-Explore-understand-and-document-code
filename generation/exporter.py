@@ -30,17 +30,17 @@ def export_to_markdown(project_doc: ProjectDoc, output_dir: str) -> list[Path]:
 
         if module.function_docs:
             sections.append("## Functions & Methods\n")
-            for name, doc in module.function_docs.items():
+            for doc in module.function_docs.values():
                 sections.append(doc + "\n\n---\n")
 
         if module.class_docs:
             sections.append("## Classes\n")
-            for name, doc in module.class_docs.items():
+            for doc in module.class_docs.values():
                 sections.append(doc + "\n\n---\n")
 
         if module.table_docs:
             sections.append("## SQL Tables\n")
-            for name, doc in module.table_docs.items():
+            for doc in module.table_docs.values():
                 sections.append(doc + "\n\n---\n")
 
         module_file.write_text("\n".join(sections), encoding="utf-8")
@@ -48,10 +48,7 @@ def export_to_markdown(project_doc: ProjectDoc, output_dir: str) -> list[Path]:
 
     # Index global des modules
     index = out / "INDEX.md"
-    index_lines = [
-        ,
-        "# Documentation Index\n\n| Module | Link |\n|--------|------|\n",
-    ]
+    index_lines = ["# Documentation Index\n\n| Module | Link |\n|--------|------|\n"]
     for module in project_doc.modules:
         safe_name = (
             module.file_path.replace("/", "_")

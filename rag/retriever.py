@@ -1,5 +1,6 @@
 # rag/retriever.py
 from dataclasses import dataclass
+from typing import Optional
 from embedding.embedder import Embedder
 from embedding.vector_store import VectorStore
 
@@ -23,9 +24,9 @@ class Retriever:
     def retrieve(
         self,
         query: str,
-        filter_language: str = None,
-        filter_type: str = None,
-        filter_file: str = None,
+        filter_language: Optional[str] = None,
+        filter_type: Optional[str] = None,
+        filter_file: Optional[str] = None,
     ) -> list[RetrievedContext]:
         query_vector = self.embedder.embed_query(query)
 

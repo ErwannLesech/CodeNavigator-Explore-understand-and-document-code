@@ -1,13 +1,10 @@
 # ingestion/parser_dispatcher.py
 from dataclasses import dataclass
 from typing import Optional
-import logging
 from ingestion.repo_walker import SourceFile
 from ingestion.python_parser import parse_python_file, ModuleInfo
 from ingestion.sql_parser import parse_sql_file, SqlFileInfo
 from ingestion.treesitter_parser import parse_with_treesitter, TreeSitterResult
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -34,39 +31,19 @@ class ParsedFile:
 
 def dispatch_parser(source_file: SourceFile, sql_dialect: str = "ansi") -> ParsedFile:
     result = ParsedFile(source_file=source_file)
-    logger.debug(
-        f"dispatch_parser: language={source_file.language}, file={source_file.relative_path}"
-    )
-
-    try:
-        if source_file.language == "python":
-            logger.debug(f"  Using python_parser for {source_file.relative_path}")
-            result.python_info = parse_python_file(
-                source_file.content, source_file.relative_path
-            )
-            logger.debug(f"  Python parse complete: {result.summary()}")
-
-        elif source_file.language == "sql":
-            logger.debug(f"  Using sql_parser for {source_file.relative_path}")
-            result.sql_info = parse_sql_file(
-                source_file.content, source_file.relative_path, dialect=sql_dialect
-            )
-            logger.debug(f"  SQL parse complete: {result.summary()}")
-
-        else:
-            logger.debug(
-                f"  Using treesitter_parser for {source_file.relative_path} (language={source_file.language})"
-            )
-            result.ts_result = parse_with_treesitter(
-                source_file.content, source_file.language, source_file.relative_path
-            )
-            logger.debug(f"  TreeSitter parse complete: {result.summary()}")
-
+    if source_file.language == "python":
+        result.python_info = parse_python_file(
+            source_file.content, source_file.relative_path
+        )
         return result
 
-    except Exception as e:
-        logger.error(
-            f"Error in dispatch_parser for {source_file.relative_path}: {e}",
-            exc_info=True,
+    if source_file.language == "sql":
+        result.sql_info = parse_sql_file(
+            source_file.content, source_file.relative_path, dialect=sql_dialect
         )
-        raise
+        return result
+
+    result.ts_result = parse_with_treesitter(
+        source_file.content, source_file.language, source_file.relative_path
+    )
+    return result

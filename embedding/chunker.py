@@ -1,12 +1,9 @@
 # embedding/chunker.py
 from dataclasses import dataclass, field
 from typing import Optional
-import logging
 from ingestion.parser_dispatcher import ParsedFile
 from ingestion.python_parser import FunctionInfo, ClassInfo
 from ingestion.sql_parser import TableSchema, QueryInfo
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -25,7 +22,7 @@ class Chunk:
     metadata: dict = field(default_factory=dict)
 
 
-def _build_id(*parts: str) -> str:
+def _build_id(*parts: Optional[str]) -> str:
     return "::".join(p for p in parts if p)
 
 
@@ -163,69 +160,48 @@ def _format_sql_query(query: QueryInfo, file_path: str, index: int) -> Chunk:
 def chunk_parsed_file(parsed: ParsedFile) -> list[Chunk]:
     chunks = []
     file_path = parsed.source_file.relative_path
-    logger.debug(f"Chunking file: {file_path}")
 
-    try:
-        # --- Python ---
-        if parsed.python_info:
-            info = parsed.python_info
-            logger.debug(
-                f"  Python file: {len(info.functions)} functions, {len(info.classes)} classes"
+    # --- Python ---
+    if parsed.python_info:
+        info = parsed.python_info
+
+        # Chunk module-level (vue d'ensemble du fichier)
+        module_lines = [f"Module: {file_path}"]
+        if info.docstring:
+            module_lines.append(f"Docstring: {info.docstring}")
+        if info.imports:
+            module_lines.append(f"Imports: {', '.join(info.imports[:10])}")  # top 10
+        module_lines.append(
+            f"Contains: {len(info.functions)} functions, {len(info.classes)} classes"
+        )
+
+        chunks.append(
+            Chunk(
+                chunk_id=_build_id(file_path, "__module__"),
+                content="\n".join(module_lines),
+                chunk_type="module",
+                language="python",
+                source_file=file_path,
+                metadata={"has_docstring": info.docstring is not None},
             )
+        )
 
-            # Chunk module-level (vue d'ensemble du fichier)
-            module_lines = [f"Module: {file_path}"]
-            if info.docstring:
-                module_lines.append(f"Docstring: {info.docstring}")
-            if info.imports:
-                module_lines.append(
-                    f"Imports: {', '.join(info.imports[:10])}"
-                )  # top 10
-            module_lines.append(
-                f"Contains: {len(info.functions)} functions, {len(info.classes)} classes"
-            )
+        # Fonctions top-level
+        for func in info.functions:
+            chunks.append(_format_function(func, file_path))
 
-            chunks.append(
-                Chunk(
-                    chunk_id=_build_id(file_path, "__module__"),
-                    content="\n".join(module_lines),
-                    chunk_type="module",
-                    language="python",
-                    source_file=file_path,
-                    metadata={"has_docstring": info.docstring is not None},
-                )
-            )
+        # Classes + méthodes
+        for cls in info.classes:
+            chunks.append(_format_class(cls, file_path))
+            for method in cls.methods:
+                chunks.append(_format_function(method, file_path, parent=cls.name))
 
-            # Fonctions top-level
-            for func in info.functions:
-                chunks.append(_format_function(func, file_path))
-                logger.debug(f"    Added function: {func.name}")
+    # --- SQL ---
+    if parsed.sql_info:
+        info = parsed.sql_info
+        for schema in info.schemas:
+            chunks.append(_format_table_schema(schema, file_path))
+        for i, query in enumerate(info.queries):
+            chunks.append(_format_sql_query(query, file_path, i))
 
-            # Classes + méthodes
-            for cls in info.classes:
-                chunks.append(_format_class(cls, file_path))
-                logger.debug(
-                    f"    Added class: {cls.name} with {len(cls.methods)} methods"
-                )
-                for method in cls.methods:
-                    chunks.append(_format_function(method, file_path, parent=cls.name))
-
-        # --- SQL ---
-        if parsed.sql_info:
-            info = parsed.sql_info
-            logger.debug(
-                f"  SQL file: {len(info.schemas)} tables, {len(info.queries)} queries"
-            )
-            for schema in info.schemas:
-                chunks.append(_format_table_schema(schema, file_path))
-                logger.debug(f"    Added table schema: {schema.name}")
-            for i, query in enumerate(info.queries):
-                chunks.append(_format_sql_query(query, file_path, i))
-                logger.debug(f"    Added query {i}: {query.query_type}")
-
-        logger.debug(f"Chunked {file_path}: {len(chunks)} chunks generated")
-        return chunks
-
-    except Exception as e:
-        logger.error(f"Error chunking file {file_path}: {e}", exc_info=True)
-        raise
+    return chunks
