@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
