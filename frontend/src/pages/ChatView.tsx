@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
-import { api, type ChatMessage, type ChatResponse } from "@/lib/api";
+import { api, type ChatMessage, type ChatResponse, type ChatSource } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 interface DisplayMessage extends ChatMessage {
-  sources?: string[];
+  sources?: ChatSource[];
 }
 
-function SourcesCollapsible({ sources }: { sources: string[] }) {
+function SourcesCollapsible({ sources }: { sources: ChatSource[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-2">
@@ -21,7 +21,9 @@ function SourcesCollapsible({ sources }: { sources: string[] }) {
       {open && (
         <ul className="mt-1 pl-4 space-y-0.5">
           {sources.map((s) => (
-            <li key={s} className="text-xs font-mono text-muted-foreground">{s}</li>
+            <li key={s.chunk_id} className="text-xs font-mono text-muted-foreground">
+              {s.source_file} [{s.chunk_type}] score={s.score}
+            </li>
           ))}
         </ul>
       )}
@@ -65,11 +67,9 @@ export default function ChatView() {
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
 
-    const history: ChatMessage[] = newMessages.map(({ role, content }) => ({ role, content }));
-
     setLoading(true);
     try {
-      const res: ChatResponse = await api.chat(text, history);
+      const res: ChatResponse = await api.chat(text);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: res.answer, sources: res.sources },
@@ -81,9 +81,14 @@ export default function ChatView() {
     }
   };
 
-  const reset = () => {
+  const reset = async () => {
     setMessages([]);
     setError(null);
+    try {
+      await api.resetChat();
+    } catch {
+      setError("Failed to reset backend chat state");
+    }
   };
 
   return (

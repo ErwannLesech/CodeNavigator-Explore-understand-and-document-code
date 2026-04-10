@@ -8,9 +8,10 @@ const NODE_COLORS: Record<string, string> = {
   class: "#899438",
   function: "#ED2C82",
   table: "#E09030",
+  column: "#7B6CF6",
 };
 
-const NODE_TYPES = ["module", "class", "function", "table"] as const;
+const NODE_TYPES = ["module", "class", "function", "table", "column"] as const;
 
 export default function GraphView() {
   const [data, setData] = useState<GraphData | null>(null);
@@ -44,10 +45,10 @@ export default function GraphView() {
         links: data.edges
           .filter(
             (e) =>
-              data.nodes.find((n) => n.id === e.source && visibleTypes.has(n.type)) &&
-              data.nodes.find((n) => n.id === e.target && visibleTypes.has(n.type))
+              data.nodes.find((n) => n.id === String(e.source) && visibleTypes.has(n.type)) &&
+              data.nodes.find((n) => n.id === String(e.target) && visibleTypes.has(n.type))
           )
-          .map((e) => ({ source: e.source, target: e.target, relation: e.relation })),
+          .map((e) => ({ source: String(e.source), target: String(e.target), relation: e.relation })),
       }
     : { nodes: [], links: [] };
 
