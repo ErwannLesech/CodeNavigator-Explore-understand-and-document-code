@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import ForceGraph2D from "react-force-graph-2d";
-import { Loader2, X } from "lucide-react";
-import { api, type GraphData } from "@/lib/api";
+import { FileCode2, Loader2, Network, X } from "lucide-react";
+import { api, type DiagramItem, type GraphData } from "@/lib/api";
 
 const NODE_COLORS: Record<string, string> = {
   module: "#4981B9",
@@ -12,9 +12,15 @@ const NODE_COLORS: Record<string, string> = {
 };
 
 const NODE_TYPES = ["module", "class", "function", "table", "column"] as const;
+type GraphTab = "graph" | "diagrams";
 
 export default function GraphView() {
+  const [activeTab, setActiveTab] = useState<GraphTab>("graph");
   const [data, setData] = useState<GraphData | null>(null);
+  const [diagrams, setDiagrams] = useState<DiagramItem[]>([]);
+  const [selectedDiagram, setSelectedDiagram] = useState<string | null>(null);
+  const [diagramSvg, setDiagramSvg] = useState<string>("");
+  const [diagramLoading, setDiagramLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -23,11 +29,41 @@ export default function GraphView() {
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
-    api.getGraph()
-      .then(setData)
+    Promise.all([api.getGraph(), api.getDiagrams()])
+      .then(([graph, diagramsResponse]) => {
+        setData(graph);
+        setDiagrams(diagramsResponse.diagrams);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!selectedDiagram) {
+      setDiagramSvg("");
+      return;
+    }
+
+    let active = true;
+    setDiagramLoading(true);
+    api.getDiagram(selectedDiagram)
+      .then(async (diagram) => {
+        const mermaid = (await import("mermaid")).default;
+        mermaid.initialize({ startOnLoad: false, securityLevel: "loose", theme: "neutral" });
+        const rendered = await mermaid.render(`diagram-${Date.now()}`, diagram.content);
+        if (active) setDiagramSvg(rendered.svg);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      })
+      .finally(() => {
+        if (active) setDiagramLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedDiagram]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -112,7 +148,27 @@ export default function GraphView() {
 
   return (
     <div className="flex h-screen relative">
+      <div className="absolute top-4 right-4 z-10 flex bg-card border rounded-lg overflow-hidden shadow-sm">
+        <button
+          onClick={() => setActiveTab("graph")}
+          className={`px-3 py-2 text-xs font-medium flex items-center gap-1.5 ${
+            activeTab === "graph" ? "bg-primary text-primary-foreground" : "bg-card text-foreground"
+          }`}
+        >
+          <Network className="w-3.5 h-3.5" /> Graph
+        </button>
+        <button
+          onClick={() => setActiveTab("diagrams")}
+          className={`px-3 py-2 text-xs font-medium flex items-center gap-1.5 ${
+            activeTab === "diagrams" ? "bg-primary text-primary-foreground" : "bg-card text-foreground"
+          }`}
+        >
+          <FileCode2 className="w-3.5 h-3.5" /> Diagrams
+        </button>
+      </div>
+
       {/* Filter bar */}
+      {activeTab === "graph" && (
       <div className="absolute top-4 left-4 z-10 flex gap-2 bg-card/90 backdrop-blur rounded-lg px-3 py-2 border shadow-sm">
         {NODE_TYPES.map((t) => (
           <button
@@ -133,24 +189,66 @@ export default function GraphView() {
           </button>
         ))}
       </div>
+      )}
 
       {/* Graph */}
-      <div ref={containerRef} className="flex-1">
-        <ForceGraph2D
-          graphData={filteredData}
-          width={dimensions.width - (selected ? 280 : 0)}
-          height={dimensions.height}
-          nodeCanvasObject={nodeCanvasObject}
-          onNodeClick={(node: any) => setSelected(node.id)}
-          onBackgroundClick={() => setSelected(null)}
-          linkColor={() => "hsl(214, 20%, 85%)"}
-          linkWidth={1}
-          cooldownTicks={100}
-        />
-      </div>
+      {activeTab === "graph" ? (
+        <div ref={containerRef} className="flex-1">
+          <ForceGraph2D
+            graphData={filteredData}
+            width={dimensions.width - (selected ? 280 : 0)}
+            height={dimensions.height}
+            nodeCanvasObject={nodeCanvasObject}
+            onNodeClick={(node: any) => setSelected(node.id)}
+            onBackgroundClick={() => setSelected(null)}
+            linkColor={() => "hsl(214, 20%, 85%)"}
+            linkWidth={1}
+            cooldownTicks={100}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 flex min-h-0">
+          <aside className="w-80 border-r bg-card overflow-y-auto">
+            <div className="px-4 py-3 border-b text-sm font-semibold">Mermaid diagrams</div>
+            <ul className="py-1">
+              {diagrams.map((diagram) => (
+                <li key={diagram.name}>
+                  <button
+                    onClick={() => setSelectedDiagram(diagram.name)}
+                    className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                      selectedDiagram === diagram.name ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                    }`}
+                  >
+                    {diagram.name}
+                  </button>
+                </li>
+              ))}
+              {diagrams.length === 0 && (
+                <li className="px-4 py-3 text-sm text-muted-foreground">No .mermaid files found</li>
+              )}
+            </ul>
+          </aside>
+          <div className="flex-1 overflow-auto p-6 bg-background">
+            {!selectedDiagram ? (
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                Select a Mermaid diagram to preview it
+              </div>
+            ) : diagramLoading ? (
+              <div className="h-full flex items-center justify-center">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="rounded-lg border bg-card p-4 min-h-full">
+                <div className="mb-3 text-xs text-muted-foreground">{selectedDiagram}</div>
+                <div dangerouslySetInnerHTML={{ __html: diagramSvg }} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Detail panel */}
-      {selectedNode && (
+      {activeTab === "graph" && selectedNode && (
         <div className="w-72 border-l bg-card p-5 overflow-y-auto">
           <div className="flex items-start justify-between mb-4">
             <h3 className="font-semibold text-sm">{selectedNode.label}</h3>
