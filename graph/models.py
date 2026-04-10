@@ -20,6 +20,7 @@ class EdgeType(str, Enum):
     WRITES_TABLE = "writes_table"  # requête écrit dans une table
     HAS_COLUMN = "has_column"  # table a une colonne
     FOREIGN_KEY = "foreign_key"  # colonne référence une autre table
+    DEPENDS_ON = "depends_on"  # table cible dépend d'une table source
 
 
 @dataclass

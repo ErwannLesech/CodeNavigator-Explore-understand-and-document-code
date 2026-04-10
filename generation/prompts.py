@@ -1,86 +1,101 @@
 from embedding.chunker import Chunk
 
 
-SYSTEM_PROMPT = """You are a senior software engineer writing technical documentation.
-Your task is to generate clear, accurate, and concise documentation based on code analysis.
-Rules:
-- Never invent behavior that is not explicitly visible in the provided code
-- If something is unclear, say so explicitly rather than guessing
-- Write in the same language as the instructions you receive
-- Output only the documentation, no preamble or commentary
-- Use Markdown formatting
+SYSTEM_PROMPT = """Tu es un ingenieur logiciel senior charge de rediger de la documentation technique.
+Ta mission est de produire une documentation claire, exacte, concise et utile dans le contexte du projet.
+Regles:
+- N'invente jamais un comportement non visible explicitement dans le code fourni
+- Si une information est incertaine, indique-le clairement au lieu de supposer
+- Reste factuel, concret, sans style marketing ni ton pompeux
+- Garde le meme niveau de details sur tous les elements documentes
+- Retourne uniquement la documentation en Markdown, sans preambule
 """
 
 
 def prompt_for_function(chunk: Chunk) -> str:
-    return f"""Generate documentation for this Python function.
+    return f"""Genere la documentation de cette fonction Python.
 
-## Code analysis
+## Analyse du code
 {chunk.content}
 
-## Output format (strict)
+## Format de sortie (strict)
 ### `{chunk.metadata.get("name", "unknown")}()`
-**Description**: [one sentence, what it does]
+**Contexte projet**: [ou cette fonction s'insere dans le module et pourquoi elle existe]
 
-**Arguments**:
-| Name | Description |
-|------|-------------|
-[one row per argument, or "No arguments" if empty]
+**Description**: [1 phrase, role principal]
 
-**Returns**: [what it returns, or "None"]
+**Entrees**:
+| Nom | Type (si visible) | Description |
+|-----|-------------------|-------------|
+[1 ligne par argument, ou "Aucune" si vide]
 
-**Notes**: [edge cases, important behaviors, or "None"]
+**Sortie**: [valeur retournee, ou "None"]
+
+**Dependances**: [appels/fonctions/modules relies, ou "Aucune"]
+
+**Points d'attention**: [cas limites, effets de bord, preconditions, ou "Aucun"]
 """
 
 
-def prompt_for_class(chunk: Chunk, method_docs: list[str] = None) -> str:
+def prompt_for_class(chunk: Chunk, method_docs: list[str] | None = None) -> str:
     methods_context = ""
     if method_docs:
-        methods_context = "\n## Already documented methods\n" + "\n---\n".join(
+        methods_context = "\n## Methodes deja documentees\n" + "\n---\n".join(
             method_docs[:5]
         )
 
-    return f"""Generate documentation for this Python class.
+    return f"""Genere la documentation de cette classe Python.
 
-## Code analysis
+## Analyse du code
 {chunk.content}
 {methods_context}
 
-## Output format (strict)
+## Format de sortie (strict)
 ### Class `{chunk.metadata.get("name", "unknown")}`
-**Description**: [what this class represents or does]
+**Contexte projet**: [role de la classe dans le module/projet]
 
-**Inherits from**: {", ".join(chunk.metadata.get("bases", [])) or "nothing"}
+**Description**: [ce que represente la classe et son objectif]
 
-**Responsibilities**:
-- [bullet point per main responsibility, max 4]
+**Herite de**: {", ".join(chunk.metadata.get("bases", [])) or "rien"}
 
-**Methods summary**:
-| Method | Description |
-|--------|-------------|
-[one row per public method]
+**Entrees principales**: [parametres d'initialisation visibles, ou "Aucune"]
+
+**Sortie/etat**: [etat porte par la classe ou objets produits, ou "Non applicable"]
+
+**Dependances**: [classes/modules relies, ou "Aucune"]
+
+**Points d'attention**:
+- [maximum 4 points: invariants, limites, comportements notables]
+
+**Resume des methodes**:
+| Methode | Role |
+|---------|------|
+[1 ligne par methode publique]
 """
 
 
 def prompt_for_table(chunk: Chunk) -> str:
-    return f"""Generate documentation for this SQL table.
+    return f"""Genere la documentation de cette table SQL.
 
-## Schema analysis
+## Analyse du schema
 {chunk.content}
 
-## Output format (strict)
+## Format de sortie (strict)
 ### Table `{chunk.metadata.get("table_name", "unknown")}`
-**Description**: [what this table stores, inferred from column names]
+**Contexte projet**: [position de cette table dans le pipeline de donnees]
 
-**Columns**:
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-[one row per column]
+**Description**: [ce que la table stocke, infere depuis le schema]
 
-**Relationships**:
-[foreign keys as bullet points, or "No foreign keys"]
+**Entrees/structure**:
+| Colonne | Type | Contraintes | Description |
+|---------|------|-------------|-------------|
+[1 ligne par colonne]
 
-**Usage notes**: [inferred usage patterns, or "None"]
+**Sortie/usage**: [comment la table est exploitee en lecture (jointures, agrg, reporting), ou "Non precise"]
+
+**Dependances**: [cles etrangeres, tables amont/aval, ou "Aucune"]
+
+**Points d'attention**: [qualite de donnees, cardinalite, champs sensibles, ou "Aucun"]
 """
 
 
@@ -88,29 +103,35 @@ def prompt_for_module(
     file_path: str, function_docs: list[str], class_docs: list[str], imports: list[str]
 ) -> str:
     all_docs = "\n---\n".join(function_docs + class_docs)
-    imports_str = "\n".join(imports[:15]) if imports else "None"
+    imports_str = "\n".join(imports[:15]) if imports else "Aucun"
 
-    return f"""Generate a module-level documentation page.
+    return f"""Genere une documentation de niveau module.
 
 ## Module: {file_path}
 ## Imports (top 15)
 {imports_str}
 
-## Documented components
+## Composants documentes
 {all_docs}
 
-## Output format (strict)
+## Format de sortie (strict)
 ## Module `{file_path}`
-**Purpose**: [one paragraph, what this module does and why it exists]
+**Contexte projet**: [place du module dans l'architecture globale]
 
-**Key components**:
-| Name | Type | Role |
-|------|------|------|
-[one row per function or class]
+**Description**: [1 paragraphe court: ce que fait le module et pourquoi il existe]
 
-**Dependencies**: [main external imports and why they are used]
+**Entrees**: [entrees principales exposees (fonctions/classes/API), ou "Aucune"]
 
-**Entry points**: [functions meant to be called directly, or "None"]
+**Sorties**: [objets, effets ou donnees produites, ou "Aucune"]
+
+**Composants cles**:
+| Nom | Type | Role |
+|-----|------|------|
+[1 ligne par fonction ou classe]
+
+**Dependances**: [imports externes principaux et leur utilite]
+
+**Points d'attention**: [limites, couplages forts, hypothese notable, ou "Aucun"]
 """
 
 
@@ -119,54 +140,60 @@ def prompt_for_project(modules_summary: list[dict]) -> str:
         f"### {m['file']}\n{m['summary']}" for m in modules_summary
     )
 
-    return f"""Generate a project-level README documentation.
+    return f"""Genere une documentation README de niveau projet.
 
-## Modules analyzed
+## Modules analyses
 {modules_text}
 
-## Output format (strict)
-# Project Overview
+## Format de sortie (strict)
+# Vue d'ensemble du projet
 
-## Purpose
-[2-3 sentences: what this project does, who uses it, what problem it solves]
+## Contexte projet
+[2-3 phrases: objectif global, cible utilisateur, probleme adresse]
 
-## Architecture
-[paragraph describing how modules relate to each other]
+## Description
+[resume clair du fonctionnement global, sans detail inutile]
 
-## Module index
+## Entrees
+[sources d'entree principales: texte, fichiers, API, ou "Non precise"]
+
+## Sorties
+[artefacts produits: docs, graphes, index, API, etc.]
+
+## Dependances
+[dependances techniques majeures et leur role]
+
+## Index des modules
 | Module | Role |
 |--------|------|
-[one row per module]
+[1 ligne par module]
 
-## Data flow
-[paragraph or bullet points describing how data moves through the project]
-
-## Getting started
-[inferred setup steps based on imports and structure, clearly marked as inferred]
+## Points d'attention
+[limites connues, zones a forte complexite, ou "Aucun"]
 """
 
 
-RAG_SYSTEM_PROMPT = """You are CodeNavigator, an AI assistant specialized in explaining codebases.
-You answer questions about the code based exclusively on the provided context.
+RAG_SYSTEM_PROMPT = """Tu es CodeNavigator, un assistant IA specialise dans l'explication de codebases.
+Tu reponds aux questions uniquement a partir du contexte fourni.
 
-Rules:
-- Base your answer strictly on the provided context, never invent
-- If the context does not contain enough information, say so explicitly
-- Always cite your sources using [Source N] references
-- Be concise and technical
-- Answer in the same language as the question
+Regles:
+- Base ta reponse strictement sur le contexte recupere, sans invention
+- Si le contexte est insuffisant, indique-le explicitement
+- Cite toujours tes sources avec le format [Source N]
+- Reste technique, clair et concis
+- Reponds dans la meme langue que la question
 """
 
 
 def prompt_rag(query: str, context: str, graph_context: str = "") -> str:
     graph_section = ""
     if graph_context:
-        graph_section = f"\n## Dependency context (knowledge graph)\n{graph_context}\n"
+        graph_section = f"\n## Contexte de dependances (graphe de connaissances)\n{graph_context}\n"
 
-    return f"""## Retrieved context
+    return f"""## Contexte recupere
 {context}
 {graph_section}
 ## Question
 {query}
 
-Answer based solely on the context above. Cite sources with [Source N]."""
+Reponds uniquement avec le contexte ci-dessus. Cite les sources avec [Source N]."""

@@ -12,6 +12,7 @@ class GraphBuilder:
         self.graph = nx.DiGraph()
         self._nodes: dict[str, Node] = {}
         self._edges: list[Edge] = []
+        self._edge_keys: set[tuple[str, str, str]] = set()
 
     # ------------------------------------------------------------------ #
     # Helpers
@@ -27,6 +28,10 @@ class GraphBuilder:
         )
 
     def _add_edge(self, edge: Edge):
+        key = (edge.source, edge.target, edge.edge_type.value)
+        if key in self._edge_keys:
+            return
+        self._edge_keys.add(key)
         self._edges.append(edge)
         self.graph.add_edge(
             edge.source, edge.target, edge_type=edge.edge_type.value, **edge.metadata
@@ -229,6 +234,9 @@ class GraphBuilder:
 
         # Lineage des requêtes
         for query in info.queries:
+            read_tables: list[str] = []
+            written_tables: list[str] = []
+
             for table_ref in query.tables_read:
                 table_id = f"table::{table_ref.name}"
                 if not self._node_exists(table_id):
@@ -239,6 +247,7 @@ class GraphBuilder:
                             label=table_ref.name,
                         )
                     )
+                read_tables.append(table_id)
                 self._add_edge(
                     Edge(
                         source=module_id,
@@ -256,6 +265,7 @@ class GraphBuilder:
                             label=table_ref.name,
                         )
                     )
+                written_tables.append(table_id)
                 self._add_edge(
                     Edge(
                         source=module_id,
@@ -263,6 +273,23 @@ class GraphBuilder:
                         edge_type=EdgeType.WRITES_TABLE,
                     )
                 )
+
+            # Impact table -> table : toutes les sources alimentant toutes les cibles écrites.
+            for src_table in read_tables:
+                for dst_table in written_tables:
+                    if src_table == dst_table:
+                        continue
+                    self._add_edge(
+                        Edge(
+                            source=src_table,
+                            target=dst_table,
+                            edge_type=EdgeType.DEPENDS_ON,
+                            metadata={
+                                "via": file_path,
+                                "query_type": query.query_type,
+                            },
+                        )
+                    )
 
     # ------------------------------------------------------------------ #
     # Point d'entrée

@@ -22,6 +22,7 @@ EDGE_LABELS = {
     EdgeType.WRITES_TABLE: "writes",
     EdgeType.HAS_COLUMN: "has",
     EdgeType.FOREIGN_KEY: "FK",
+    EdgeType.DEPENDS_ON: "depends_on",
 }
 
 
@@ -29,6 +30,7 @@ def _safe_id(node_id: str) -> str:
     """Mermaid n'accepte pas les caractères spéciaux dans les IDs."""
     return (
         node_id.replace("::", "__")
+        .replace("\\", "_")
         .replace("/", "_")
         .replace(".", "_")
         .replace("-", "_")
@@ -162,6 +164,34 @@ def generate_erd(nodes: dict[str, Node], edges: list) -> str:
     return "\n".join(lines)
 
 
+def generate_sql_lineage_diagram(nodes: dict[str, Node], edges: list) -> str:
+    """Diagramme orienté impact SQL entre tables (amont -> aval)."""
+    lines = ["flowchart LR", "    %% SQL lineage diagram"]
+
+    table_nodes = {
+        nid: n
+        for nid, n in nodes.items()
+        if n.node_type == NodeType.TABLE and not n.metadata.get("external", False)
+    }
+
+    for nid, node in table_nodes.items():
+        _, _, style = NODE_STYLES[NodeType.TABLE]
+        lines.append(f"    style {_safe_id(nid)} {style}")
+        lines.append(f"    {_node_label(node)}")
+
+    for edge in edges:
+        if (
+            edge.edge_type == EdgeType.DEPENDS_ON
+            and edge.source in table_nodes
+            and edge.target in table_nodes
+        ):
+            src = _safe_id(edge.source)
+            tgt = _safe_id(edge.target)
+            lines.append(f"    {src} -->|feeds| {tgt}")
+
+    return "\n".join(lines)
+
+
 def export_all_diagrams(
     nodes: dict[str, Node], edges: list, output_dir: str
 ) -> dict[str, str]:
@@ -184,6 +214,10 @@ def export_all_diagrams(
         erd = generate_erd(nodes, edges)
         (out / "erd.mermaid").write_text(erd, encoding="utf-8")
         diagrams["erd"] = erd
+
+        lineage = generate_sql_lineage_diagram(nodes, edges)
+        (out / "sql_lineage.mermaid").write_text(lineage, encoding="utf-8")
+        diagrams["sql_lineage"] = lineage
 
     # 3. Un diagramme de classes par fichier Python
     python_files = list(

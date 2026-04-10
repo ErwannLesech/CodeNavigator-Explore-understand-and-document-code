@@ -7,11 +7,17 @@ from graph.models import Node, Edge
 def export_graph_json(
     nodes: dict[str, Node], edges: list[Edge], output_path: str
 ) -> dict:
+    serialized_nodes = []
+    for n in nodes.values():
+        metadata = dict(n.metadata)
+        if "type" in metadata:
+            metadata["data_type"] = metadata.pop("type")
+        serialized_nodes.append(
+            {"id": n.node_id, "type": n.node_type.value, "label": n.label, **metadata}
+        )
+
     data = {
-        "nodes": [
-            {"id": n.node_id, "type": n.node_type.value, "label": n.label, **n.metadata}
-            for n in nodes.values()
-        ],
+        "nodes": serialized_nodes,
         "edges": [
             {
                 "source": e.source,
