@@ -1,6 +1,6 @@
-from pathlib import Path
+﻿from pathlib import Path
 
-from ingestion.repo_walker import walk_repo
+from src.codeNavigator.ingestion.repo_walker import walk_repo
 
 
 def test_walk_repo_filters_by_extension_and_ignored_dirs(tmp_path: Path) -> None:
@@ -34,3 +34,4 @@ def test_walk_repo_strips_utf8_bom_from_python_files(tmp_path: Path) -> None:
     assert len(files) == 1
     assert files[0].relative_path == "bom_file.py"
     assert files[0].content.startswith("import logging")
+

@@ -1,19 +1,19 @@
-"""
+﻿"""
 review.py
 
 Shared review logic for both pipelines.
 Called by GitHub Actions with environment variables.
 
 Environment variables:
-    MISTRAL_API_KEY     — Mistral API key
-    GITHUB_TOKEN        — GitHub token with pull-requests: write
-    GITHUB_REPOSITORY   — e.g. "owner/repo"
-    PR_NUMBER           — pull request number
-    PR_TITLE            — pull request title
-    PR_BODY             — pull request description
-    COMMIT_SHA          — latest commit SHA on the PR branch
-    PIPELINE_MODE       — "inline" (level 1) or "comment" (level 2)
-    DIFF_TRUNCATED      — "true" if diff was truncated
+    MISTRAL_API_KEY     - Mistral API key
+    GITHUB_TOKEN        - GitHub token with pull-requests: write
+    GITHUB_REPOSITORY   - e.g. "owner/repo"
+    PR_NUMBER           - pull request number
+    PR_TITLE            - pull request title
+    PR_BODY             - pull request description
+    COMMIT_SHA          - latest commit SHA on the PR branch
+    PIPELINE_MODE       - "inline" (level 1) or "comment" (level 2)
+    DIFF_TRUNCATED      - "true" if diff was truncated
 """
 
 import json
@@ -162,11 +162,11 @@ SYSTEM_PROMPT = """
 You are a senior fullstack engineer reviewing pull requests on a project using
 React (frontend) and FastAPI + Python (backend).
 
-## Conventions — Python / FastAPI
+## Conventions ÔÇö Python / FastAPI
 - snake_case functions/variables, PascalCase classes and Pydantic models
 - SCREAMING_SNAKE_CASE constants
 - Type hints on every function signature
-- Pydantic models for all request/response bodies — never raw dicts
+- Pydantic models for all request/response bodies ÔÇö never raw dicts
 - logging only, never print()
 - Black (88 chars), isort
 - All routes: explicit response_model, explicit status_code, async for I/O
@@ -175,7 +175,7 @@ React (frontend) and FastAPI + Python (backend).
 - Concurrent access to shared state must be under a lock
 - Read-modify-write on files must be atomic (single lock covering read + write)
 
-## Conventions — React / TypeScript
+## Conventions ÔÇö React / TypeScript
 - PascalCase components, camelCase hooks prefixed with use
 - Named exports except page components
 - No inline styles, no class components
@@ -194,7 +194,7 @@ Valid types: feat fix chore refactor test docs style perf ci
 """
 
 # ---------------------------------------------------------------------------
-# LLM call — inline mode (structured JSON output)
+# LLM call ÔÇö inline mode (structured JSON output)
 # ---------------------------------------------------------------------------
 
 INLINE_USER_PROMPT_TEMPLATE = """
@@ -217,7 +217,7 @@ Schema:
   "blocking_issues": [
     {{
       "file": "<path/to/file.py>",
-      "line": <int — new file line number, must exist in the diff>,
+      "line": <int ÔÇö new file line number, must exist in the diff>,
       "comment": "<direct description of the issue and why it matters>",
       "suggestion": "<replacement code block if applicable, else null>"
     }}
@@ -225,7 +225,7 @@ Schema:
   "suggestions": [
     {{
       "file": "<path/to/file.py>",
-      "line": <int — new file line number, must exist in the diff>,
+      "line": <int ÔÇö new file line number, must exist in the diff>,
       "comment": "<non-blocking improvement>",
       "suggestion": "<replacement code block if applicable, else null>"
     }}
@@ -251,7 +251,7 @@ Rules:
 """
 
 # ---------------------------------------------------------------------------
-# LLM call — comment mode (markdown output)
+# LLM call ÔÇö comment mode (markdown output)
 # ---------------------------------------------------------------------------
 
 COMMENT_USER_PROMPT_TEMPLATE = """
@@ -341,7 +341,7 @@ def post_review_with_inline_comments(review_data: dict, position_map: dict):
     body_lines = [
         "## AI Code Review (Mistral)",
         "",
-        f"**Score**: {score}/10 — **{review_data.get('verdict', 'N/A')}**",
+        f"**Score**: {score}/10 ÔÇö **{review_data.get('verdict', 'N/A')}**",
         "",
         review_data.get("summary", ""),
     ]
@@ -376,7 +376,7 @@ def post_review_with_inline_comments(review_data: dict, position_map: dict):
 
         position = position_map.get((file, int(line)))
         if position is None:
-            # Line not in diff — try adjacent lines (+/- 3)
+            # Line not in diff ÔÇö try adjacent lines (+/- 3)
             for delta in range(1, 4):
                 position = position_map.get((file, int(line) + delta))
                 if position:
@@ -408,7 +408,7 @@ def post_review_with_inline_comments(review_data: dict, position_map: dict):
             "\n\n### Additional findings (could not be anchored to a diff line)\n"
         )
         for item in unresolved:
-            review_body += f"\n- **{item.get('file', '?')}:{item.get('line', '?')}** — {item.get('comment', '')}"
+            review_body += f"\n- **{item.get('file', '?')}:{item.get('line', '?')}** ÔÇö {item.get('comment', '')}"
             if item.get("suggestion"):
                 review_body += f"\n{item['suggestion']}"
 

@@ -29,34 +29,37 @@ CodeNavigator est un outil d'exploration de code qui automatise:
 
 ```text
 CodeNavigator/
-|- api/
+|- backend/
 |  `- chat.py
-|- embedding/
-|  |- chunker.py
-|  |- embedder.py
-|  |- indexer.py
-|  `- vector_store.py
-|- generation/
-|  |- assembler.py
-|  |- doc_generator.py
-|  |- exporter.py
-|  `- prompts.py
-|- graph/
-|  |- builder.py
-|  |- json_exporter.py
-|  |- mermaid_exporter.py
-|  `- models.py
-|- ingestion/
-|  |- parser_dispatcher.py
-|  |- python_parser.py
-|  |- repo_walker.py
-|  |- sql_parser.py
-|  `- treesitter_parser.py
-|- rag/
-|  |- chatbot.py
-|  |- cli.py
-|  |- graph_context.py
-|  `- retriever.py
+|- src/
+|  `- codeNavigator/
+|     |- embedding/
+|     |  |- chunker.py
+|     |  |- embedder.py
+|     |  |- indexer.py
+|     |  `- vector_store.py
+|     |- generation/
+|     |  |- assembler.py
+|     |  |- doc_generator.py
+|     |  |- exporter.py
+|     |  `- prompts.py
+|     |- graph/
+|     |  |- builder.py
+|     |  |- json_exporter.py
+|     |  |- mermaid_exporter.py
+|     |  `- models.py
+|     |- ingestion/
+|     |  |- parser_dispatcher.py
+|     |  |- python_parser.py
+|     |  |- repo_walker.py
+|     |  |- sql_parser.py
+|     |  `- treesitter_parser.py
+|     `- rag/
+|        |- chatbot.py
+|        |- cli.py
+|        |- graph_context.py
+|        `- retriever.py
+|- frontend/
 |- tests/
 |  `- ingestion/
 |- data/
@@ -183,13 +186,13 @@ python main.py chat --graph data/output/graph/graph.json
 
 ## Endpoint API Chat (FastAPI)
 
-Le routeur est defini dans api/chat.py (prefixe /api/chat).
+Le routeur est defini dans backend/chat.py (prefixe /api/chat).
 
 Exemple d'integration:
 
 ```python
 from fastapi import FastAPI
-from api.chat import router as chat_router
+from backend.chat import router as chat_router
 
 app = FastAPI(title="CodeNavigator API")
 app.include_router(chat_router)

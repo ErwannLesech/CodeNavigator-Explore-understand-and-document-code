@@ -1,4 +1,4 @@
-from ingestion.python_parser import parse_python_file
+﻿from src.codeNavigator.ingestion.python_parser import parse_python_file
 
 
 def test_parse_python_file_extracts_module_structure() -> None:
@@ -38,3 +38,4 @@ class User(BaseUser):
     assert len(cls.methods) == 1
     assert cls.methods[0].name == "method"
     assert cls.methods[0].is_method is True
+

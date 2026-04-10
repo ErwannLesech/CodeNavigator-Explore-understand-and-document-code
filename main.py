@@ -1,16 +1,16 @@
-import argparse
-from embedding.indexer import run_indexing
-from generation.assembler import build_project_doc
-from generation.doc_generator import DocGenerator
-from generation.exporter import export_to_markdown
+﻿import argparse
+from src.codeNavigator.embedding.indexer import run_indexing
+from src.codeNavigator.generation.assembler import build_project_doc
+from src.codeNavigator.generation.doc_generator import DocGenerator
+from src.codeNavigator.generation.exporter import export_to_markdown
 
-from ingestion.repo_walker import walk_repo
-from ingestion.parser_dispatcher import dispatch_parser
-from graph.builder import GraphBuilder
-from graph.mermaid_exporter import export_all_diagrams
-from graph.json_exporter import export_graph_json
+from src.codeNavigator.ingestion.repo_walker import walk_repo
+from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
+from src.codeNavigator.graph.builder import GraphBuilder
+from src.codeNavigator.graph.mermaid_exporter import export_all_diagrams
+from src.codeNavigator.graph.json_exporter import export_graph_json
 
-from rag.cli import run_chat_cli
+from src.codeNavigator.rag.cli import run_chat_cli
 
 
 def main():
@@ -88,3 +88,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

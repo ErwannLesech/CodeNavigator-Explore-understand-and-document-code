@@ -1,4 +1,4 @@
-from ingestion.sql_parser import parse_sql_file
+﻿from src.codeNavigator.ingestion.sql_parser import parse_sql_file
 
 
 def test_parse_sql_file_extracts_schema_and_query() -> None:
@@ -55,3 +55,4 @@ FROM staging.customers;
     assert query.query_type == "INSERT"
     assert any(t.name == "customer_dim" for t in query.tables_written)
     assert any(t.name == "customers" for t in query.tables_read)
+
