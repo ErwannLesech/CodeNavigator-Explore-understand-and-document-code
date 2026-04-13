@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { MessageSquare, BookOpen, Share2 } from "lucide-react";
+import { MessageSquare, BookOpen, Share2, FileCode2 } from "lucide-react";
 import { api } from "@/lib/api";
 import talanLogo from "@/assets/talan-logo.svg";
 
@@ -8,6 +8,7 @@ const navItems = [
   { to: "/", label: "Chat", icon: MessageSquare },
   { to: "/docs", label: "Documentation", icon: BookOpen },
   { to: "/graph", label: "Knowledge Graph", icon: Share2 },
+  { to: "/diagrams", label: "Diagrammes Mermaid", icon: FileCode2 },
 ];
 
 export default function AppSidebar() {

@@ -5,9 +5,10 @@ SYSTEM_PROMPT = """Tu es un ingenieur logiciel senior charge de rediger de la do
 Ta mission est de produire une documentation claire, exacte, concise et utile dans le contexte du projet.
 Regles:
 - N'invente jamais un comportement non visible explicitement dans le code fourni
-- Si une information est incertaine, indique-le clairement au lieu de supposer
+- Ne deduis pas une regle metier, une contrainte ou un flux si ce n'est pas explicite dans le code
+- Si une information est incertaine, indique "Non visible dans le code fourni" au lieu de supposer
 - Reste factuel, concret, sans style marketing ni ton pompeux
-- Garde le meme niveau de details sur tous les elements documentes
+- Reste bref: vise une documentation utile mais compacte (environ 10-15% plus courte qu'un rapport detaille classique)
 - Retourne uniquement la documentation en Markdown, sans preambule
 - N'utilise jamais de bloc de code de type ```markdown, ```md ou ``` pour encapsuler la reponse
 - Les tableaux Markdown doivent etre sur plusieurs lignes valides (ligne d'entete, ligne de separation, puis une ligne par entree)
@@ -35,7 +36,7 @@ def prompt_for_function(chunk: Chunk) -> str:
 
 **Dependances**: [appels/fonctions/modules relies, ou "Aucune"]
 
-**Points d'attention**: [cas limites, effets de bord, preconditions, ou "Aucun"]
+**Points d'attention**: [1 a 3 points maximum: cas limites, effets de bord, preconditions, ou "Aucun"]
 """
 
 
@@ -56,7 +57,7 @@ def prompt_for_class(chunk: Chunk, method_docs: list[str] | None = None) -> str:
 ### Class `{chunk.metadata.get("name", "unknown")}`
 **Contexte projet**: [role de la classe dans le module/projet]
 
-**Description**: [ce que represente la classe et son objectif]
+**Description**: [1 a 2 phrases maximum: ce que represente la classe et son objectif]
 
 **Herite de**: {", ".join(chunk.metadata.get("bases", [])) or "rien"}
 
@@ -67,7 +68,7 @@ def prompt_for_class(chunk: Chunk, method_docs: list[str] | None = None) -> str:
 **Dependances**: [classes/modules relies, ou "Aucune"]
 
 **Points d'attention**:
-- [maximum 4 points: invariants, limites, comportements notables]
+- [maximum 3 points: invariants, limites, comportements notables]
 
 **Resume des methodes**:
 | Methode | Role |
@@ -86,7 +87,7 @@ def prompt_for_table(chunk: Chunk) -> str:
 ### Table `{chunk.metadata.get("table_name", "unknown")}`
 **Contexte projet**: [position de cette table dans le pipeline de donnees]
 
-**Description**: [ce que la table stocke, infere depuis le schema]
+**Description**: [1 a 2 phrases maximum: ce que la table stocke, infere depuis le schema]
 
 **Entrees/structure**:
 | Colonne | Type | Contraintes | Description |
@@ -97,7 +98,7 @@ def prompt_for_table(chunk: Chunk) -> str:
 
 **Dependances**: [cles etrangeres, tables amont/aval, ou "Aucune"]
 
-**Points d'attention**: [qualite de donnees, cardinalite, champs sensibles, ou "Aucun"]
+**Points d'attention**: [1 a 3 points maximum: qualite de donnees, cardinalite, champs sensibles, ou "Aucun"]
 """
 
 
@@ -120,7 +121,7 @@ def prompt_for_module(
 ## Module `{file_path}`
 **Contexte projet**: [place du module dans l'architecture globale]
 
-**Description**: [1 paragraphe court: ce que fait le module et pourquoi il existe]
+**Description**: [1 paragraphe court (3-4 phrases max): ce que fait le module et pourquoi il existe]
 
 **Entrees**: [entrees principales exposees (fonctions/classes/API), ou "Aucune"]
 
@@ -133,7 +134,7 @@ def prompt_for_module(
 
 **Dependances**: [imports externes principaux et leur utilite]
 
-**Points d'attention**: [limites, couplages forts, hypothese notable, ou "Aucun"]
+**Points d'attention**: [1 a 3 points maximum: limites, couplages forts, hypothese notable, ou "Aucun"]
 """
 
 
@@ -151,10 +152,10 @@ def prompt_for_project(modules_summary: list[dict]) -> str:
 # Vue d'ensemble du projet
 
 ## Contexte projet
-[2-3 phrases: objectif global, cible utilisateur, probleme adresse]
+[2 phrases max: objectif global, cible utilisateur, probleme adresse]
 
 ## Description
-[resume clair du fonctionnement global, sans detail inutile]
+[resume clair du fonctionnement global, sans detail inutile (4-5 phrases max)]
 
 ## Entrees
 [sources d'entree principales: texte, fichiers, API, ou "Non precise"]
@@ -171,7 +172,7 @@ def prompt_for_project(modules_summary: list[dict]) -> str:
 [1 ligne par module]
 
 ## Points d'attention
-[limites connues, zones a forte complexite, ou "Aucun"]
+[1 a 4 points maximum: limites connues, zones a forte complexite, ou "Aucun"]
 """
 
 

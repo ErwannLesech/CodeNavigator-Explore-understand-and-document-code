@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import dagre from "dagre";
 import ForceGraph2D from "react-force-graph-2d";
 import { Loader2, X } from "lucide-react";
 import { api, type GraphData } from "@/lib/api";
 
-const NODE_COLORS: Record<string, string> = {
+const TYPE_COLORS: Record<string, string> = {
   module: "#4981B9",
   class: "#899438",
   function: "#ED2C82",
@@ -11,7 +12,16 @@ const NODE_COLORS: Record<string, string> = {
   column: "#7B6CF6",
 };
 
-const NODE_TYPES = ["module", "class", "function", "table", "column"] as const;
+const SCRIPT_TYPES = new Set(["module", "class", "function"]);
+
+const LAYOUT_OPTIONS = [
+  { id: "free", label: "Libre" },
+  { id: "lr", label: "Gauche a droite" },
+  { id: "bt", label: "Bas en haut" },
+] as const;
+
+const NODE_TYPES = ["module", "class", "function", "table"] as const;
+type LayoutMode = (typeof LAYOUT_OPTIONS)[number]["id"];
 
 interface GraphNode {
   id: string;
@@ -26,6 +36,13 @@ interface GraphEdge {
   relation: string;
 }
 
+interface RenderNode extends GraphNode {
+  x?: number;
+  y?: number;
+  fx?: number;
+  fy?: number;
+}
+
 function getEndpointId(endpoint: unknown): string {
   if (typeof endpoint === "string") return endpoint;
   if (endpoint && typeof endpoint === "object" && "id" in endpoint) {
@@ -34,11 +51,23 @@ function getEndpointId(endpoint: unknown): string {
   return String(endpoint ?? "");
 }
 
+function isDependencyRelation(relation: string): boolean {
+  return relation === "depends_on" || relation === "reads_table" || relation === "writes_table";
+}
+
+function getNodeBox(node: GraphNode): { width: number; height: number } {
+  if (node.type === "table") return { width: 26, height: 16 };
+  if (SCRIPT_TYPES.has(node.type)) return { width: 20, height: 20 };
+  return { width: 12, height: 12 };
+}
+
 export default function GraphView() {
   const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("free");
   const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(NODE_TYPES));
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<any>(null);
@@ -80,19 +109,25 @@ export default function GraphView() {
   const nodes = useMemo(() => (data?.nodes ?? []) as GraphNode[], [data]);
   const edges = useMemo(() => (data?.edges ?? []) as any[], [data]);
 
+  const graphNodes = useMemo(() => nodes.filter((node) => node.type !== "column"), [nodes]);
+
   const nodeById = useMemo(() => {
-    return new Map(nodes.map((node) => [node.id, node]));
-  }, [nodes]);
+    return new Map(graphNodes.map((node) => [node.id, node]));
+  }, [graphNodes]);
+
+  const autocompleteNodes = useMemo(() => {
+    return [...graphNodes].sort((a, b) => a.label.localeCompare(b.label));
+  }, [graphNodes]);
 
   const filteredData = useMemo(() => {
     if (!data) return { nodes: [], links: [] as GraphEdge[] };
 
     const visibleNodeIds = new Set(
-      nodes.filter((node) => visibleTypes.has(node.type)).map((node) => node.id),
+      graphNodes.filter((node) => visibleTypes.has(node.type)).map((node) => node.id),
     );
 
     return {
-      nodes: nodes.filter((node) => visibleNodeIds.has(node.id)),
+      nodes: graphNodes.filter((node) => visibleNodeIds.has(node.id)),
       links: edges
         .filter(
           (edge) =>
@@ -105,7 +140,57 @@ export default function GraphView() {
           relation: String(edge.type ?? edge.relation ?? "related"),
         })),
     };
-  }, [data, nodes, edges, visibleTypes]);
+  }, [data, graphNodes, edges, visibleTypes]);
+
+  const graphData = useMemo(() => {
+    const baseNodes: RenderNode[] = filteredData.nodes.map((node) => ({ ...node }));
+    const links: GraphEdge[] = filteredData.links.map((edge) => ({ ...edge }));
+
+    if (layoutMode === "free") {
+      return {
+        nodes: baseNodes.map((node) => ({ ...node, fx: undefined, fy: undefined })),
+        links,
+      };
+    }
+
+    const dag = new dagre.graphlib.Graph();
+    dag.setGraph({
+      rankdir: layoutMode === "lr" ? "LR" : "BT",
+      nodesep: 22,
+      ranksep: 62,
+      marginx: 20,
+      marginy: 20,
+    });
+    dag.setDefaultEdgeLabel(() => ({}));
+
+    for (const node of baseNodes) {
+      const { width, height } = getNodeBox(node);
+      dag.setNode(node.id, { width, height });
+    }
+
+    const layoutLinks = links.filter((edge) => isDependencyRelation(edge.relation));
+    const edgesToUse = layoutLinks.length > 0 ? layoutLinks : links;
+    for (const edge of edgesToUse) {
+      dag.setEdge(edge.source, edge.target);
+    }
+
+    dagre.layout(dag);
+
+    return {
+      nodes: baseNodes.map((node) => {
+        const coords = dag.node(node.id) as { x: number; y: number } | undefined;
+        if (!coords) return { ...node, fx: undefined, fy: undefined };
+        return {
+          ...node,
+          x: coords.x,
+          y: coords.y,
+          fx: layoutMode === "lr" ? coords.x : undefined,
+          fy: layoutMode === "bt" ? coords.y : undefined,
+        };
+      }),
+      links,
+    };
+  }, [filteredData.links, filteredData.nodes, layoutMode]);
 
   const fitGraph = useCallback((duration = 450, padding = 50) => {
     if (!graphRef.current) return;
@@ -113,11 +198,11 @@ export default function GraphView() {
   }, []);
 
   useEffect(() => {
-    if (!graphRef.current || filteredData.nodes.length === 0) return;
+    if (!graphRef.current || graphData.nodes.length === 0) return;
 
     const timeout = window.setTimeout(() => fitGraph(450, 70), 120);
     return () => window.clearTimeout(timeout);
-  }, [filteredData.nodes.length, filteredData.links.length, dimensions.width, dimensions.height, fitGraph]);
+  }, [graphData.nodes.length, graphData.links.length, dimensions.width, dimensions.height, layoutMode, fitGraph]);
 
   const selectedNode = selected ? nodeById.get(selected) : undefined;
 
@@ -132,7 +217,7 @@ export default function GraphView() {
     const neighborIds = new Set<string>();
     const groupedByType = new Map<string, GraphNode[]>();
 
-    for (const edge of filteredData.links) {
+    for (const edge of graphData.links) {
       const source = getEndpointId(edge.source);
       const target = getEndpointId(edge.target);
       if (source !== selectedNode.id && target !== selectedNode.id) continue;
@@ -164,15 +249,15 @@ export default function GraphView() {
     }
 
     return { neighborIds, groupedByType: dedupedGroupedByType };
-  }, [filteredData.links, nodeById, selectedNode]);
+  }, [graphData.links, nodeById, selectedNode]);
 
   const typeCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const node of nodes) {
+    for (const node of graphNodes) {
       counts.set(node.type, (counts.get(node.type) ?? 0) + 1);
     }
     return counts;
-  }, [nodes]);
+  }, [graphNodes]);
 
   const toggleType = (t: string) => {
     setVisibleTypes((prev) => {
@@ -182,15 +267,54 @@ export default function GraphView() {
     });
   };
 
+  const focusNode = useCallback((nodeId: string) => {
+    const targetNode = nodeById.get(nodeId);
+    if (!targetNode) return;
+
+    setVisibleTypes((prev) => {
+      const next = new Set(prev);
+      next.add(targetNode.type);
+      return next;
+    });
+    setSelected(nodeId);
+
+    window.setTimeout(() => {
+      if (!graphRef.current) return;
+      const liveNodes = (graphRef.current.graphData()?.nodes ?? []) as Array<{
+        id: string;
+        x?: number;
+        y?: number;
+      }>;
+      const liveNode = liveNodes.find((n) => n.id === nodeId);
+      if (!liveNode || typeof liveNode.x !== "number" || typeof liveNode.y !== "number") return;
+
+      graphRef.current.centerAt(liveNode.x, liveNode.y, 550);
+      graphRef.current.zoom(2.6, 550);
+    }, 140);
+  }, [nodeById]);
+
+  const trySelectBySearch = useCallback(
+    (raw: string) => {
+      const query = raw.trim().toLowerCase();
+      if (!query) return;
+
+      const exact = autocompleteNodes.find((node) => node.label.toLowerCase() === query);
+      if (!exact) return;
+
+      focusNode(exact.id);
+    },
+    [autocompleteNodes, focusNode],
+  );
+
   const nodeCanvasObject = useCallback(
-    (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+    (node: RenderNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const radius = 5;
       const isFocused = !selected || node.id === selected || selectedNeighborhood.neighborIds.has(node.id);
 
       ctx.globalAlpha = isFocused ? 1 : 0.16;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-      ctx.fillStyle = NODE_COLORS[node.type] || "#94a3b8";
+      ctx.arc(node.x ?? 0, node.y ?? 0, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = TYPE_COLORS[node.type] || "#94a3b8";
       ctx.fill();
 
       if (node.id === selected) {
@@ -206,7 +330,7 @@ export default function GraphView() {
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         ctx.fillStyle = "#334155";
-        ctx.fillText(node.label || node.id, node.x, node.y + radius + 1.5);
+        ctx.fillText(node.label || node.id, node.x ?? 0, (node.y ?? 0) + radius + 1.5);
       }
 
       ctx.globalAlpha = 1;
@@ -250,6 +374,45 @@ export default function GraphView() {
         <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Filtres
         </div>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {LAYOUT_OPTIONS.map((mode) => (
+            <button
+              key={mode.id}
+              onClick={() => setLayoutMode(mode.id)}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                layoutMode === mode.id
+                  ? "bg-foreground text-background"
+                  : "border text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+        <div className="mb-3">
+          <input
+            list="graph-node-autocomplete"
+            value={searchTerm}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearchTerm(value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                trySelectBySearch(searchTerm);
+              }
+            }}
+            onBlur={() => trySelectBySearch(searchTerm)}
+            placeholder="Rechercher un noeud..."
+            className="w-full rounded border bg-background px-2.5 py-1.5 text-xs outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2"
+          />
+          <datalist id="graph-node-autocomplete">
+            {autocompleteNodes.map((node) => (
+              <option key={node.id} value={node.label} />
+            ))}
+          </datalist>
+        </div>
         <div className="flex max-w-[75vw] flex-wrap gap-2">
           {NODE_TYPES.map((t) => (
             <button
@@ -258,9 +421,9 @@ export default function GraphView() {
               className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                 visibleTypes.has(t) ? "text-white" : "bg-muted text-muted-foreground"
               }`}
-              style={visibleTypes.has(t) ? { backgroundColor: NODE_COLORS[t] } : {}}
+              style={visibleTypes.has(t) ? { backgroundColor: TYPE_COLORS[t] } : {}}
             >
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: NODE_COLORS[t] }} />
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: TYPE_COLORS[t] }} />
               {t}
               <span className="opacity-80">{typeCounts.get(t) ?? 0}</span>
             </button>
@@ -282,7 +445,7 @@ export default function GraphView() {
               <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                 <span
                   className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: NODE_COLORS[selectedNode.type] || "#94a3b8" }}
+                  style={{ backgroundColor: TYPE_COLORS[selectedNode.type] || "#94a3b8" }}
                 />
                 <span className="capitalize">{selectedNode.type}</span>
               </div>
@@ -328,16 +491,23 @@ export default function GraphView() {
 
       <ForceGraph2D
         ref={graphRef}
-        graphData={filteredData}
+        graphData={graphData}
         width={graphWidth}
         height={graphHeight}
         nodeCanvasObject={nodeCanvasObject}
-        onNodeClick={(node: any) => setSelected(node.id)}
-        onBackgroundClick={() => setSelected(null)}
-        enableNodeDrag={false}
-        cooldownTicks={55}
-        d3AlphaDecay={0.05}
-        d3VelocityDecay={0.45}
+        onNodeClick={(node: any) => {
+          setSelected(node.id);
+          const clickedNode = nodeById.get(String(node.id));
+          if (clickedNode) setSearchTerm(clickedNode.label);
+        }}
+        onBackgroundClick={() => {
+          setSelected(null);
+          setSearchTerm("");
+        }}
+        enableNodeDrag={true}
+        cooldownTicks={layoutMode === "free" ? 55 : 80}
+        d3AlphaDecay={layoutMode === "free" ? 0.05 : 0.08}
+        d3VelocityDecay={layoutMode === "free" ? 0.45 : 0.3}
         linkColor={(link: any) => {
           if (!selected) return "hsl(214, 20%, 82%)";
           const isNeighbor =
@@ -352,6 +522,10 @@ export default function GraphView() {
             String(link.target?.id ?? link.target) === selected;
           return isNeighbor ? 1.9 : 0.6;
         }}
+        linkDirectionalArrowLength={(link: any) =>
+          isDependencyRelation(String(link.relation ?? link.type ?? "")) ? 3.8 : 0
+        }
+        linkDirectionalArrowRelPos={1}
         onEngineStop={onEngineStop}
       />
     </div>

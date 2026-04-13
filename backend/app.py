@@ -29,6 +29,7 @@ class DocModule(BaseModel):
     name: str
     path: str
     kind: str = "module"
+    source_path: str | None = None
 
 
 class DocsListResponse(BaseModel):
@@ -45,6 +46,7 @@ class DocsSearchResult(BaseModel):
     path: str
     kind: str
     snippet: str
+    source_path: str | None = None
 
 
 class DocsSearchResponse(BaseModel):
@@ -80,9 +82,16 @@ def _list_doc_modules() -> list[DocModule]:
     if not MODULES_DIR.exists() or not MODULES_DIR.is_dir():
         return []
 
+    source_by_doc = _extract_source_paths_by_doc_name()
     modules: list[DocModule] = []
     for path in sorted(MODULES_DIR.glob("*.md"), key=lambda p: p.name.lower()):
-        modules.append(DocModule(name=path.name, path=str(path.relative_to(DOCS_OUTPUT_DIR))))
+        modules.append(
+            DocModule(
+                name=path.name,
+                path=str(path.relative_to(DOCS_OUTPUT_DIR)),
+                source_path=source_by_doc.get(path.name),
+            )
+        )
     return modules
 
 
@@ -115,6 +124,20 @@ def _extract_doc_links_from_index() -> dict[str, str]:
         source_path = _normalize_path(match.group(1))
         doc_name = match.group(2)
         mapping[source_path] = doc_name
+    return mapping
+
+
+def _extract_source_paths_by_doc_name() -> dict[str, str]:
+    if not INDEX_PATH.exists() or not INDEX_PATH.is_file():
+        return {}
+
+    mapping: dict[str, str] = {}
+    content = INDEX_PATH.read_text(encoding="utf-8")
+    pattern = re.compile(r"\|\s*`([^`]+)`\s*\|\s*\[doc\]\(modules/([^\)]+)\)")
+    for match in pattern.finditer(content):
+        source_path = match.group(1).replace("\\", "/")
+        doc_name = match.group(2)
+        mapping[doc_name] = source_path
     return mapping
 
 
@@ -182,6 +205,7 @@ def _search_docs(query: str) -> list[DocsSearchResult]:
         return []
 
     results: list[DocsSearchResult] = []
+    source_by_doc = _extract_source_paths_by_doc_name()
     for doc in [*_list_global_docs(), *_list_doc_modules()]:
         path = _safe_doc_path(doc.name)
         content = path.read_text(encoding="utf-8")
@@ -192,6 +216,7 @@ def _search_docs(query: str) -> list[DocsSearchResult]:
                     path=doc.path,
                     kind=doc.kind,
                     snippet=_build_snippet(content, query),
+                    source_path=source_by_doc.get(doc.name),
                 )
             )
     return results
@@ -296,7 +321,12 @@ def _related_docs(module_name: str) -> list[DocModule]:
         doc_name = mapping.get(raw)
         if doc_name:
             related.append(
-                DocModule(name=doc_name, path=f"modules/{doc_name}", kind="module")
+                DocModule(
+                    name=doc_name,
+                    path=f"modules/{doc_name}",
+                    kind="module",
+                    source_path=raw,
+                )
             )
     return related
 
