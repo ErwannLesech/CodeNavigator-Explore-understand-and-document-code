@@ -76,11 +76,17 @@ CodeNavigator/
 - Cle API Mistral (obligatoire pour generation et chat)
 - Qdrant (obligatoire pour indexation vectorielle et RAG)
 
-Option recommande pour Qdrant (Docker):
+Option recommande (Docker Compose) pour lancer Qdrant + backend + frontend:
 
 ```bash
-docker run -p 6333:6333 qdrant/qdrant
+docker-compose up --build
 ```
+
+Services exposes:
+
+- Frontend: http://localhost:5173
+- Backend: http://localhost:8001
+- Qdrant: http://localhost:6333
 
 ## Installation
 

@@ -9,6 +9,8 @@ Regles:
 - Reste factuel, concret, sans style marketing ni ton pompeux
 - Garde le meme niveau de details sur tous les elements documentes
 - Retourne uniquement la documentation en Markdown, sans preambule
+- N'utilise jamais de bloc de code de type ```markdown, ```md ou ``` pour encapsuler la reponse
+- Les tableaux Markdown doivent etre sur plusieurs lignes valides (ligne d'entete, ligne de separation, puis une ligne par entree)
 """
 
 

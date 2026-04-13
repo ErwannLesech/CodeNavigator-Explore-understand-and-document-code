@@ -1,7 +1,30 @@
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { FileText, Loader2, Search } from "lucide-react";
 import { api, type DocModule, type DocsSearchResult } from "@/lib/api";
+
+function normalizeMarkdownContent(rawContent: string): string {
+  let content = rawContent.trim();
+
+  // Some generated docs wrap markdown sections in ```markdown fences.
+  const unwrappedMarkdownFences = content.replace(
+    /```(?:markdown|md)\s*\n([\s\S]*?)```/gi,
+    "$1",
+  );
+
+  if (unwrappedMarkdownFences !== content) {
+    content = unwrappedMarkdownFences.trim();
+  }
+
+  // Handle the case where the whole file is wrapped once in generic fences.
+  const fullyWrappedMatch = content.match(/^```[\w-]*\s*\n([\s\S]*?)\n```$/);
+  if (fullyWrappedMatch && /(^|\n)\s*#{1,6}\s+/.test(fullyWrappedMatch[1])) {
+    content = fullyWrappedMatch[1].trim();
+  }
+
+  return content;
+}
 
 export default function DocsView() {
   const [documents, setDocuments] = useState<DocModule[]>([]);
@@ -58,7 +81,7 @@ export default function DocsView() {
     setError(null);
     try {
       const r = await api.getDoc(name);
-      setContent(r.content);
+      setContent(normalizeMarkdownContent(r.content));
     } catch (e: any) {
       setError(e.message);
       setContent("");
@@ -197,7 +220,7 @@ export default function DocsView() {
           <div className="text-accent text-sm">{error}</div>
         ) : content ? (
           <article className="prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-pre:bg-muted prose-pre:rounded-lg">
-            <ReactMarkdown>{content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
           </article>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">

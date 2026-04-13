@@ -1,4 +1,5 @@
 ﻿import os
+import re
 import time
 from typing import Optional
 from mistralai import Mistral
@@ -26,6 +27,17 @@ class DocGenerator:
         self.delay = delay  # d�lai entre les appels pour �viter le rate limit
         self._call_count = 0
 
+    @staticmethod
+    def _sanitize_markdown_response(content: str) -> str:
+        cleaned = content.strip()
+        cleaned = re.sub(r"```(?:markdown|md)\\s*\\n([\\s\\S]*?)```", r"\1", cleaned, flags=re.IGNORECASE)
+
+        wrapped = re.match(r"^```[\\w-]*\\s*\\n([\\s\\S]*?)\\n```$", cleaned)
+        if wrapped:
+            cleaned = wrapped.group(1)
+
+        return cleaned.strip()
+
     def _call(self, prompt: str, max_tokens: int = 1024) -> str:
         self._call_count += 1
         if self._call_count > 1:
@@ -44,12 +56,13 @@ class DocGenerator:
 
         content = response.choices[0].message.content
         if isinstance(content, str):
-            return content
+            return self._sanitize_markdown_response(content)
         if isinstance(content, list):
-            return "\n".join(getattr(item, "text", str(item)) for item in content)
+            merged = "\n".join(getattr(item, "text", str(item)) for item in content)
+            return self._sanitize_markdown_response(merged)
         if content is None:
             raise RuntimeError("LLM API returned empty content")
-        return str(content)
+        return self._sanitize_markdown_response(str(content))
 
     def document_function(self, chunk: Chunk) -> str:
         return self._call(prompt_for_function(chunk))
