@@ -1,4 +1,6 @@
 ﻿# embedding/vector_store.py
+import os
+
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -20,6 +22,8 @@ VECTOR_SIZE = 1024  # text-embedding-3-small
 
 class VectorStore:
     def __init__(self, host: str = "localhost", port: int = 6333):
+        host = os.getenv("QDRANT_HOST", host)
+        port = int(os.getenv("QDRANT_PORT", str(port)))
         self.client = QdrantClient(host=host, port=port)
 
     def create_collection(self, recreate: bool = False):

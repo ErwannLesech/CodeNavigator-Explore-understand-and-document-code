@@ -1,10 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
-import { api, type ChatMessage, type ChatResponse, type ChatSource } from "@/lib/api";
+import {
+  api,
+  type ChatMessage,
+  type ChatResponse,
+  type ChatSource,
+  type ChatDebugInfo,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 interface DisplayMessage extends ChatMessage {
   sources?: ChatSource[];
+  debug?: ChatDebugInfo;
 }
 
 function SourcesCollapsible({ sources }: { sources: ChatSource[] }) {
@@ -45,6 +52,83 @@ function LoadingDots() {
   );
 }
 
+function DebugPanel({ debug }: { debug: ChatDebugInfo }) {
+  const [open, setOpen] = useState(false);
+  const retrieval = debug.retrieval_context ?? [];
+
+  return (
+    <div className="mt-2 rounded-md border border-border/70 bg-muted/50">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <span className="flex items-center gap-1">
+          {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+          Debug RAG
+        </span>
+        <span>
+          {debug.duration_ms ? `${debug.duration_ms} ms` : "-"} · tokens: {debug.tokens?.total ?? "-"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="space-y-2 border-t border-border/60 px-2 py-2 text-xs text-muted-foreground">
+          {debug.vector_status === "unavailable" && (
+            <div className="rounded border border-amber-300/60 bg-amber-100/40 px-2 py-1 text-[11px] text-amber-900">
+              Base vectorielle indisponible: reponse en mode graphe uniquement.
+            </div>
+          )}
+
+          <p>
+            model: <span className="font-mono">{debug.model ?? "unknown"}</span> | prompt: {debug.tokens?.prompt ?? "-"} |
+            completion: {debug.tokens?.completion ?? "-"} | total: {debug.tokens?.total ?? "-"}
+          </p>
+
+          {debug.vector_error && (
+            <p className="font-mono text-[11px] text-muted-foreground/90">vector_error: {debug.vector_error}</p>
+          )}
+
+          {retrieval.length > 0 && (
+            <div className="space-y-1">
+              <p className="font-semibold text-foreground/80">Contexte injecte ({retrieval.length})</p>
+              <ul className="space-y-1">
+                {retrieval.map((ctx) => (
+                  <li key={ctx.chunk_id} className="rounded border border-border/60 bg-background/40 p-2">
+                    <p className="font-mono text-[11px]">
+                      {ctx.source_file} [{ctx.chunk_type}] score={ctx.score}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-[11px] text-muted-foreground/90">
+                      {ctx.content_excerpt}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {debug.graph_context && (
+            <div className="space-y-1">
+              <p className="font-semibold text-foreground/80">Contexte graphe</p>
+              <pre className="max-h-44 overflow-auto rounded border border-border/60 bg-background/40 p-2 font-mono text-[11px] whitespace-pre-wrap">
+                {debug.graph_context}
+              </pre>
+            </div>
+          )}
+
+          {debug.prompt_preview && (
+            <div className="space-y-1">
+              <p className="font-semibold text-foreground/80">Prompt enrichi (apercu)</p>
+              <pre className="max-h-44 overflow-auto rounded border border-border/60 bg-background/40 p-2 font-mono text-[11px] whitespace-pre-wrap">
+                {debug.prompt_preview}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChatView() {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
@@ -72,7 +156,12 @@ export default function ChatView() {
       const res: ChatResponse = await api.chat(text);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: res.answer, sources: res.sources },
+        {
+          role: "assistant",
+          content: res.answer,
+          sources: res.sources,
+          debug: res.debug,
+        },
       ]);
     } catch (e: any) {
       setError(e.message || "Failed to get response");
@@ -123,9 +212,15 @@ export default function ChatView() {
               }`}
             >
               <p className="whitespace-pre-wrap">{msg.content}</p>
+              {msg.role === "assistant" && msg.debug?.vector_status === "unavailable" && (
+                <p className="mt-2 inline-flex rounded-md border border-amber-300/70 bg-amber-100/50 px-2 py-0.5 text-[11px] text-amber-900">
+                  Vector DB indisponible - mode graphe
+                </p>
+              )}
               {msg.sources && msg.sources.length > 0 && (
                 <SourcesCollapsible sources={msg.sources} />
               )}
+              {msg.role === "assistant" && msg.debug && <DebugPanel debug={msg.debug} />}
             </div>
           </div>
         ))}

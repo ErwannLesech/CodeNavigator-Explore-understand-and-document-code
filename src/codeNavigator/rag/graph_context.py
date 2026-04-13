@@ -96,5 +96,47 @@ class GraphContextProvider:
 
         return "\n".join(lines) if lines else ""
 
+    def get_context_for_query(self, query: str, max_nodes: int = 6) -> str:
+        terms = [t.strip().lower() for t in query.replace("_", " ").split() if len(t) >= 3]
+        if not terms:
+            return ""
+
+        matched: list[dict] = []
+        seen: set[str] = set()
+        for node in self.nodes.values():
+            label = str(node.get("label", "")).lower()
+            if not label:
+                continue
+            if any(term in label for term in terms):
+                node_id = node.get("id")
+                if isinstance(node_id, str) and node_id not in seen:
+                    seen.add(node_id)
+                    matched.append(node)
+            if len(matched) >= max_nodes:
+                break
+
+        lines: list[str] = []
+        for node in matched:
+            node_id = node.get("id")
+            if not isinstance(node_id, str):
+                continue
+
+            lines.append(f"Node: {node.get('label', node_id)} ({node.get('type', 'unknown')})")
+            outgoing = [e for e in self.edges if e.get("source") == node_id][:4]
+            incoming = [e for e in self.edges if e.get("target") == node_id][:4]
+
+            for e in outgoing:
+                target = self.nodes.get(e.get("target"), {})
+                lines.append(
+                    f"  --> {e.get('type', 'related_to')} --> {target.get('label', e.get('target'))}"
+                )
+            for e in incoming:
+                source = self.nodes.get(e.get("source"), {})
+                lines.append(
+                    f"  <-- {e.get('type', 'related_to')} <-- {source.get('label', e.get('source'))}"
+                )
+
+        return "\n".join(lines)
+
 
 
