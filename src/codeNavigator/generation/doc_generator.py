@@ -15,7 +15,7 @@ from src.codeNavigator.generation.prompts import (
 
 
 class DocGenerator:
-    def __init__(self, model: str = "mistral-large-latest", delay: float = 0.3):
+    def __init__(self, model: str = "mistral-large-latest", delay: float = 0.15):
         api_key = os.getenv("MISTRAL_API_KEY")
         if not api_key:
             raise ValueError(
@@ -38,7 +38,7 @@ class DocGenerator:
 
         return cleaned.strip()
 
-    def _call(self, prompt: str, max_tokens: int = 1024) -> str:
+    def _call(self, prompt: str, max_tokens: int = 420) -> str:
         self._call_count += 1
         if self._call_count > 1:
             time.sleep(self.delay)
@@ -65,15 +65,15 @@ class DocGenerator:
         return self._sanitize_markdown_response(str(content))
 
     def document_function(self, chunk: Chunk) -> str:
-        return self._call(prompt_for_function(chunk))
+        return self._call(prompt_for_function(chunk), max_tokens=220)
 
     def document_class(
         self, chunk: Chunk, method_docs: Optional[list[str]] = None
     ) -> str:
-        return self._call(prompt_for_class(chunk, method_docs or []), max_tokens=1500)
+        return self._call(prompt_for_class(chunk, method_docs or []), max_tokens=280)
 
     def document_table(self, chunk: Chunk) -> str:
-        return self._call(prompt_for_table(chunk))
+        return self._call(prompt_for_table(chunk), max_tokens=240)
 
     def document_module(
         self,
@@ -84,11 +84,11 @@ class DocGenerator:
     ) -> str:
         return self._call(
             prompt_for_module(file_path, function_docs, class_docs, imports),
-            max_tokens=2000,
+            max_tokens=420,
         )
 
     def document_project(self, modules_summary: list[dict]) -> str:
-        return self._call(prompt_for_project(modules_summary), max_tokens=3000)
+        return self._call(prompt_for_project(modules_summary), max_tokens=520)
 
 
 

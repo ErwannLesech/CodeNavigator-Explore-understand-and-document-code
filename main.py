@@ -1,4 +1,5 @@
 ﻿import argparse
+import os
 from src.codeNavigator.embedding.indexer import run_indexing
 from src.codeNavigator.generation.assembler import build_project_doc
 from src.codeNavigator.generation.doc_generator import DocGenerator
@@ -11,6 +12,9 @@ from src.codeNavigator.graph.mermaid_exporter import export_all_diagrams
 from src.codeNavigator.graph.json_exporter import export_graph_json
 
 from src.codeNavigator.rag.cli import run_chat_cli
+
+
+DOCS_DETAIL_LEVEL = os.getenv("DOCS_DETAIL_LEVEL", "compact")
 
 
 def main():
@@ -58,7 +62,11 @@ def main():
     elif args.command == "generate":
         chunks = run_indexing(args.repo, sql_dialect=args.dialect, dry_run=True)
         generator = DocGenerator()
-        project_doc = build_project_doc(chunks, generator)
+        project_doc = build_project_doc(
+            chunks,
+            generator,
+            detail_level=DOCS_DETAIL_LEVEL,
+        )
         export_to_markdown(project_doc, args.output)
 
     elif args.command == "graph":
@@ -79,7 +87,11 @@ def main():
             args.repo, recreate_collection=args.recreate, sql_dialect=args.dialect
         )
         generator = DocGenerator()
-        project_doc = build_project_doc(chunks, generator)
+        project_doc = build_project_doc(
+            chunks,
+            generator,
+            detail_level=DOCS_DETAIL_LEVEL,
+        )
         export_to_markdown(project_doc, args.output)
 
     elif args.command == "chat":

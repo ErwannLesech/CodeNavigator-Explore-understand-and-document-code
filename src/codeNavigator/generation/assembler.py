@@ -34,9 +34,24 @@ def _get_imports_from_chunks(chunks: list[Chunk]) -> list[str]:
     return []
 
 
-def build_project_doc(chunks: list[Chunk], generator: DocGenerator) -> ProjectDoc:
+def _component_summaries_for_compact(chunks: list[Chunk], limit: int = 20) -> list[str]:
+    summaries: list[str] = []
+    for chunk in chunks:
+        name = chunk.metadata.get("name") or chunk.metadata.get("table_name") or chunk.chunk_id
+        summaries.append(f"- {chunk.chunk_type}: {name}")
+        if len(summaries) >= limit:
+            break
+    return summaries
+
+
+def build_project_doc(
+    chunks: list[Chunk],
+    generator: DocGenerator,
+    detail_level: str = "compact",
+) -> ProjectDoc:
     grouped = _group_chunks_by_file(chunks)
     module_docs = []
+    compact_mode = detail_level.lower() != "full"
 
     for file_path, file_chunks in grouped.items():
         # Trier les chunks par type pour respecter l'ordre de g�n�ration
@@ -50,10 +65,11 @@ def build_project_doc(chunks: list[Chunk], generator: DocGenerator) -> ProjectDo
         class_docs = {}
         table_docs = {}
 
-        # 1. Fonctions top-level
-        for chunk in functions:
-            name = chunk.metadata.get("name", chunk.chunk_id)
-            function_docs[name] = generator.document_function(chunk)
+        if not compact_mode:
+            # 1. Fonctions top-level
+            for chunk in functions:
+                name = chunk.metadata.get("name", chunk.chunk_id)
+                function_docs[name] = generator.document_function(chunk)
 
         # 2. M�thodes group�es par classe
         methods_by_class: dict[str, list[Chunk]] = defaultdict(list)
@@ -61,35 +77,45 @@ def build_project_doc(chunks: list[Chunk], generator: DocGenerator) -> ProjectDo
             parent = chunk.metadata.get("parent_class", "__unknown__")
             methods_by_class[parent].append(chunk)
 
-        # 3. Classes � inject�es avec les docs de leurs m�thodes
-        for chunk in classes:
-            class_name = chunk.metadata.get("name", chunk.chunk_id)
-            related_method_docs = [
-                function_docs.get(m.metadata.get("name", ""), "")
-                for m in methods_by_class.get(class_name, [])
-            ]
-            class_docs[class_name] = generator.document_class(
-                chunk, related_method_docs
-            )
-
-            # Documenter les m�thodes individuellement aussi
-            for method_chunk in methods_by_class.get(class_name, []):
-                method_name = method_chunk.metadata.get("name", method_chunk.chunk_id)
-                function_docs[f"{class_name}.{method_name}"] = (
-                    generator.document_function(method_chunk)
+        if not compact_mode:
+            # 3. Classes � inject�es avec les docs de leurs m�thodes
+            for chunk in classes:
+                class_name = chunk.metadata.get("name", chunk.chunk_id)
+                related_method_docs = [
+                    function_docs.get(m.metadata.get("name", ""), "")
+                    for m in methods_by_class.get(class_name, [])
+                ]
+                class_docs[class_name] = generator.document_class(
+                    chunk, related_method_docs
                 )
 
-        # 4. Tables SQL
-        for chunk in tables:
-            table_name = chunk.metadata.get("table_name", chunk.chunk_id)
-            table_docs[table_name] = generator.document_table(chunk)
+                # Documenter les m�thodes individuellement aussi
+                for method_chunk in methods_by_class.get(class_name, []):
+                    method_name = method_chunk.metadata.get("name", method_chunk.chunk_id)
+                    function_docs[f"{class_name}.{method_name}"] = (
+                        generator.document_function(method_chunk)
+                    )
+
+            # 4. Tables SQL
+            for chunk in tables:
+                table_name = chunk.metadata.get("table_name", chunk.chunk_id)
+                table_docs[table_name] = generator.document_table(chunk)
 
         # 5. Module-level
         imports = _get_imports_from_chunks(file_chunks)
+        module_component_summaries: list[str]
+        if compact_mode:
+            module_component_summaries = _component_summaries_for_compact(
+                [*functions, *classes, *tables],
+                limit=20,
+            )
+        else:
+            module_component_summaries = list(function_docs.values())
+
         module_doc = generator.document_module(
             file_path=file_path,
-            function_docs=list(function_docs.values()),
-            class_docs=list(class_docs.values()),
+            function_docs=module_component_summaries,
+            class_docs=[] if compact_mode else list(class_docs.values()),
             imports=imports,
         )
 
@@ -108,7 +134,7 @@ def build_project_doc(chunks: list[Chunk], generator: DocGenerator) -> ProjectDo
         {
             "file": m.file_path,
             # On injecte uniquement le r�sum� du module, pas toute la doc
-            "summary": m.module_doc[:600],
+            "summary": m.module_doc[:300],
         }
         for m in module_docs
     ]

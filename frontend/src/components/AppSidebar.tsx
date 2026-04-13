@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { MessageSquare, BookOpen, Share2, FileCode2 } from "lucide-react";
+import { MessageSquare, BookOpen, Share2, FileCode2, Workflow } from "lucide-react";
 import { api } from "@/lib/api";
 import talanLogo from "@/assets/talan-logo.svg";
 
 const navItems = [
   { to: "/", label: "Chat", icon: MessageSquare },
+  { to: "/pipeline", label: "Pipeline", icon: Workflow },
   { to: "/docs", label: "Documentation", icon: BookOpen },
   { to: "/graph", label: "Knowledge Graph", icon: Share2 },
   { to: "/diagrams", label: "Diagrammes Mermaid", icon: FileCode2 },

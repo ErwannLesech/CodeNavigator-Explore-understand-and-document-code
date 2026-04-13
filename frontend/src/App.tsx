@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/Layout";
 import ChatView from "@/pages/ChatView";
+import PipelineView from "@/pages/PipelineView";
 import DocsView from "@/pages/DocsView";
 import GraphView from "@/pages/GraphView";
 import DiagramsView from "@/pages/DiagramsView";
@@ -21,6 +22,7 @@ const App = () => (
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<ChatView />} />
+            <Route path="/pipeline" element={<PipelineView />} />
             <Route path="/docs" element={<DocsView />} />
             <Route path="/graph" element={<GraphView />} />
             <Route path="/diagrams" element={<DiagramsView />} />

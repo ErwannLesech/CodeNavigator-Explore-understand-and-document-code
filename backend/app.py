@@ -3,12 +3,28 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
+import time
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+from src.codeNavigator.embedding.chunker import chunk_parsed_file
+from src.codeNavigator.embedding.embedder import Embedder
+from src.codeNavigator.embedding.vector_store import COLLECTION_NAME, VectorStore
+from src.codeNavigator.generation.assembler import build_project_doc
+from src.codeNavigator.generation.doc_generator import DocGenerator
+from src.codeNavigator.generation.exporter import export_to_markdown
+from src.codeNavigator.graph.builder import GraphBuilder
+from src.codeNavigator.graph.json_exporter import export_graph_json
+from src.codeNavigator.graph.mermaid_exporter import export_all_diagrams
+from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
+from src.codeNavigator.ingestion.repo_walker import walk_repo
 
 from backend.chat import router as chat_router
 
@@ -19,6 +35,7 @@ GRAPH_JSON_PATH = Path(os.getenv("GRAPH_JSON_PATH", "data/output/graph/graph.jso
 DIAGRAMS_DIR = Path(os.getenv("DIAGRAMS_DIR", "data/output/graph"))
 README_PATH = DOCS_OUTPUT_DIR / "README.md"
 INDEX_PATH = DOCS_OUTPUT_DIR / "INDEX.md"
+DOCS_DETAIL_LEVEL = os.getenv("DOCS_DETAIL_LEVEL", "compact")
 
 
 class HealthResponse(BaseModel):
@@ -76,6 +93,384 @@ class DiagramsResponse(BaseModel):
 class DiagramContentResponse(BaseModel):
     name: str
     content: str
+
+
+class PipelineRunRequest(BaseModel):
+    repo: str
+    output_docs: str = "data/output/docs"
+    output_graph: str = "data/output/graph"
+    recreate: bool = False
+    dialect: str = "mysql"
+    dry_run: bool = False
+
+
+class PipelineStartResponse(BaseModel):
+    job_id: str
+    status: str
+
+
+class PipelineEvent(BaseModel):
+    timestamp: str
+    stage: str
+    message: str
+    progress: float
+    details: dict[str, Any] | None = None
+
+
+class PipelineStatusResponse(BaseModel):
+    job_id: str | None
+    status: str
+    started_at: str | None
+    finished_at: str | None
+    progress: float
+    current_stage: str
+    error: str | None
+    request: dict[str, Any] | None
+    stats: dict[str, Any]
+    outputs: dict[str, str]
+    events: list[PipelineEvent]
+
+
+class QdrantInfoResponse(BaseModel):
+    host: str
+    port: int
+    url: str
+    reachable: bool
+    active_collection: str
+    collections: list[str]
+
+
+class QdrantOpenResponse(BaseModel):
+    status: str
+    url: str
+
+
+MAX_PIPELINE_EVENTS = 600
+
+# Shared mutable runtime for pipeline jobs. Guard every read/write with this lock.
+PIPELINE_LOCK = threading.RLock()
+PIPELINE_STATE: dict[str, Any] = {
+    "job_id": None,
+    "status": "idle",
+    "started_at": None,
+    "finished_at": None,
+    "progress": 0.0,
+    "current_stage": "idle",
+    "error": None,
+    "request": None,
+    "stats": {"files": 0, "parsed_files": 0, "chunks": 0, "embeddings": 0},
+    "outputs": {"docs": "", "graph": "", "graph_json": ""},
+    "events": [],
+}
+
+
+def _utc_now() -> str:
+    return datetime.now(tz=timezone.utc).isoformat()
+
+
+def _append_pipeline_event(
+    stage: str,
+    message: str,
+    progress: float,
+    details: dict[str, Any] | None = None,
+) -> None:
+    with PIPELINE_LOCK:
+        PIPELINE_STATE["current_stage"] = stage
+        PIPELINE_STATE["progress"] = round(progress, 2)
+        event = {
+            "timestamp": _utc_now(),
+            "stage": stage,
+            "message": message,
+            "progress": round(progress, 2),
+            "details": details,
+        }
+        PIPELINE_STATE["events"].append(event)
+        if len(PIPELINE_STATE["events"]) > MAX_PIPELINE_EVENTS:
+            PIPELINE_STATE["events"] = PIPELINE_STATE["events"][-MAX_PIPELINE_EVENTS:]
+
+
+def _pipeline_snapshot() -> PipelineStatusResponse:
+    with PIPELINE_LOCK:
+        return PipelineStatusResponse(
+            job_id=PIPELINE_STATE["job_id"],
+            status=PIPELINE_STATE["status"],
+            started_at=PIPELINE_STATE["started_at"],
+            finished_at=PIPELINE_STATE["finished_at"],
+            progress=float(PIPELINE_STATE["progress"]),
+            current_stage=PIPELINE_STATE["current_stage"],
+            error=PIPELINE_STATE["error"],
+            request=dict(PIPELINE_STATE["request"]) if PIPELINE_STATE["request"] else None,
+            stats=dict(PIPELINE_STATE["stats"]),
+            outputs=dict(PIPELINE_STATE["outputs"]),
+            events=[PipelineEvent(**event) for event in PIPELINE_STATE["events"]],
+        )
+
+
+def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
+    with PIPELINE_LOCK:
+        PIPELINE_STATE["status"] = "running"
+        PIPELINE_STATE["started_at"] = _utc_now()
+        PIPELINE_STATE["finished_at"] = None
+        PIPELINE_STATE["error"] = None
+        PIPELINE_STATE["progress"] = 0.0
+        PIPELINE_STATE["current_stage"] = "starting"
+        PIPELINE_STATE["request"] = request.model_dump()
+        PIPELINE_STATE["stats"] = {
+            "files": 0,
+            "parsed_files": 0,
+            "chunks": 0,
+            "embeddings": 0,
+        }
+        PIPELINE_STATE["outputs"] = {"docs": "", "graph": "", "graph_json": ""}
+        PIPELINE_STATE["events"] = []
+
+    try:
+        _append_pipeline_event(
+            stage="starting",
+            message="Pipeline started",
+            progress=1,
+            details={"repo": request.repo},
+        )
+
+        files = list(walk_repo(request.repo))
+        if not files:
+            raise ValueError("No supported source files found in repository.")
+
+        with PIPELINE_LOCK:
+            PIPELINE_STATE["stats"]["files"] = len(files)
+
+        _append_pipeline_event(
+            stage="scan",
+            message=f"Repository scanned: {len(files)} files detected",
+            progress=6,
+        )
+
+        parsed_files = []
+        all_chunks = []
+        file_count = len(files)
+        parse_tick = max(1, file_count // 20)
+
+        for index, source_file in enumerate(files, start=1):
+            parsed = dispatch_parser(source_file, sql_dialect=request.dialect)
+            parsed_files.append(parsed)
+            file_chunks = chunk_parsed_file(parsed)
+            all_chunks.extend(file_chunks)
+
+            with PIPELINE_LOCK:
+                PIPELINE_STATE["stats"]["parsed_files"] = index
+                PIPELINE_STATE["stats"]["chunks"] = len(all_chunks)
+
+            if index % parse_tick == 0 or index == file_count:
+                _append_pipeline_event(
+                    stage="parsing",
+                    message=f"Parsed {index}/{file_count}: {source_file.relative_path}",
+                    progress=6 + (index / file_count) * 34,
+                    details={"chunks": len(all_chunks)},
+                )
+
+        store = VectorStore()
+        _append_pipeline_event(
+            stage="embedding",
+            message="Preparing Qdrant collection",
+            progress=42,
+            details={"collection": COLLECTION_NAME},
+        )
+        store.create_collection(recreate=request.recreate)
+
+        if request.dry_run:
+            _append_pipeline_event(
+                stage="embedding",
+                message="Dry-run enabled: embedding generation skipped",
+                progress=62,
+            )
+        else:
+            embedder = Embedder()
+            embeddings: list[list[float]] = []
+            total_chunks = len(all_chunks)
+            if total_chunks == 0:
+                raise ValueError("No chunks generated from parsed files.")
+
+            batch_size = 100
+            for start_idx in range(0, total_chunks, batch_size):
+                batch = all_chunks[start_idx : start_idx + batch_size]
+                response = embedder.client.embeddings.create(
+                    model="mistral-embed", inputs=[chunk.content for chunk in batch]
+                )
+                if response is None or response.data is None:
+                    raise RuntimeError("Embedding API returned an empty response")
+
+                embeddings.extend([item.embedding for item in response.data])
+                processed = min(start_idx + batch_size, total_chunks)
+                with PIPELINE_LOCK:
+                    PIPELINE_STATE["stats"]["embeddings"] = len(embeddings)
+
+                _append_pipeline_event(
+                    stage="embedding",
+                    message=f"Embedded {processed}/{total_chunks} chunks",
+                    progress=42 + (processed / total_chunks) * 20,
+                )
+
+                if processed < total_chunks:
+                    time.sleep(0.5)
+
+            store.upsert_chunks(all_chunks, embeddings)
+            _append_pipeline_event(
+                stage="embedding",
+                message="Embeddings uploaded to Qdrant",
+                progress=64,
+            )
+
+        modules_count = len({chunk.source_file for chunk in all_chunks})
+        functions_count = sum(
+            1 for chunk in all_chunks if chunk.chunk_type in {"function", "method"}
+        )
+        classes_count = sum(1 for chunk in all_chunks if chunk.chunk_type == "class")
+        tables_count = sum(1 for chunk in all_chunks if chunk.chunk_type == "table_schema")
+        estimated_llm_calls = (
+            functions_count + classes_count + tables_count + modules_count + 1
+        )
+
+        _append_pipeline_event(
+            stage="docs",
+            message="Generating project documentation",
+            progress=70,
+            details={
+                "output": request.output_docs,
+                "estimated_llm_calls": estimated_llm_calls,
+                "modules": modules_count,
+            },
+        )
+
+        docs_result: dict[str, Any] = {"ok": False, "error": None}
+
+        def _docs_worker() -> None:
+            try:
+                generator = DocGenerator()
+                project_doc = build_project_doc(
+                    all_chunks,
+                    generator,
+                    detail_level=DOCS_DETAIL_LEVEL,
+                )
+                export_to_markdown(project_doc, request.output_docs)
+                docs_result["ok"] = True
+            except Exception as docs_exc:
+                docs_result["error"] = docs_exc
+
+        docs_thread = threading.Thread(target=_docs_worker, daemon=True)
+        docs_thread.start()
+
+        docs_elapsed = 0
+        docs_heartbeat_seconds = 6
+        while docs_thread.is_alive():
+            time.sleep(docs_heartbeat_seconds)
+            docs_elapsed += docs_heartbeat_seconds
+            docs_progress = min(83.5, 70 + (docs_elapsed / 240) * 13.5)
+            _append_pipeline_event(
+                stage="docs",
+                message=(
+                    "Documentation generation in progress "
+                    f"({docs_elapsed}s elapsed)"
+                ),
+                progress=docs_progress,
+                details={
+                    "estimated_llm_calls": estimated_llm_calls,
+                    "output": request.output_docs,
+                    "detail_level": DOCS_DETAIL_LEVEL,
+                },
+            )
+
+        docs_thread.join()
+        if docs_result["error"] is not None:
+            raise RuntimeError(str(docs_result["error"]))
+
+        _append_pipeline_event(
+            stage="docs",
+            message="Documentation generated",
+            progress=84,
+            details={"output": request.output_docs},
+        )
+
+        _append_pipeline_event(
+            stage="graph",
+            message="Building knowledge graph",
+            progress=88,
+            details={"output": request.output_graph},
+        )
+
+        builder = GraphBuilder()
+        builder.ingest(parsed_files)
+        nodes = builder.get_nodes()
+        edges = builder.get_edges()
+
+        export_all_diagrams(nodes, edges, output_dir=request.output_graph)
+        graph_json_path = str(Path(request.output_graph) / "graph.json")
+        export_graph_json(nodes, edges, output_path=graph_json_path)
+
+        os.environ["GRAPH_JSON_PATH"] = graph_json_path
+        import backend.chat as chat_backend
+
+        chat_backend._chatbot = None
+
+        _append_pipeline_event(
+            stage="done",
+            message="Pipeline completed successfully",
+            progress=100,
+            details={"graph_json": graph_json_path},
+        )
+
+        with PIPELINE_LOCK:
+            PIPELINE_STATE["status"] = "succeeded"
+            PIPELINE_STATE["finished_at"] = _utc_now()
+            PIPELINE_STATE["outputs"] = {
+                "docs": request.output_docs,
+                "graph": request.output_graph,
+                "graph_json": graph_json_path,
+            }
+    except Exception as exc:
+        _append_pipeline_event(
+            stage="failed",
+            message=f"Pipeline failed: {exc}",
+            progress=float(PIPELINE_STATE.get("progress", 0.0)),
+        )
+        with PIPELINE_LOCK:
+            PIPELINE_STATE["status"] = "failed"
+            PIPELINE_STATE["finished_at"] = _utc_now()
+            PIPELINE_STATE["error"] = str(exc)
+
+
+def _qdrant_url() -> str:
+    host = os.getenv("QDRANT_HOST", "localhost")
+    port = int(os.getenv("QDRANT_PORT", "6333"))
+    return f"http://{host}:{port}/dashboard"
+
+
+def _qdrant_public_url() -> str:
+    host = os.getenv("QDRANT_PUBLIC_HOST", "localhost")
+    port = int(os.getenv("QDRANT_PUBLIC_PORT", os.getenv("QDRANT_PORT", "6333")))
+    return f"http://{host}:{port}/dashboard"
+
+
+def _qdrant_info() -> QdrantInfoResponse:
+    host = os.getenv("QDRANT_HOST", "localhost")
+    port = int(os.getenv("QDRANT_PORT", "6333"))
+    url = _qdrant_public_url()
+    collections: list[str] = []
+    reachable = False
+    try:
+        store = VectorStore(host=host, port=port)
+        collections = [c.name for c in store.client.get_collections().collections]
+        reachable = True
+    except Exception:
+        reachable = False
+
+    return QdrantInfoResponse(
+        host=host,
+        port=port,
+        url=url,
+        reachable=reachable,
+        active_collection=COLLECTION_NAME,
+        collections=collections,
+    )
 
 
 def _list_doc_modules() -> list[DocModule]:
@@ -400,6 +795,90 @@ def create_app() -> FastAPI:
         path = _safe_diagram_path(diagram_name)
         content = path.read_text(encoding="utf-8")
         return DiagramContentResponse(name=path.name, content=content)
+
+    @app.post(
+        "/api/pipeline/start",
+        response_model=PipelineStartResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    async def start_pipeline(request: PipelineRunRequest) -> PipelineStartResponse:
+        with PIPELINE_LOCK:
+            if PIPELINE_STATE["status"] == "running":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A pipeline run is already in progress.",
+                )
+            job_id = str(uuid.uuid4())
+            PIPELINE_STATE["job_id"] = job_id
+            PIPELINE_STATE["status"] = "queued"
+
+        worker = threading.Thread(
+            target=_run_pipeline_job,
+            args=(job_id, request),
+            daemon=True,
+        )
+        worker.start()
+
+        return PipelineStartResponse(job_id=job_id, status="queued")
+
+    @app.get(
+        "/api/pipeline/status",
+        response_model=PipelineStatusResponse,
+        status_code=status.HTTP_200_OK,
+    )
+    async def pipeline_status() -> PipelineStatusResponse:
+        return _pipeline_snapshot()
+
+    @app.post(
+        "/api/pipeline/reset",
+        response_model=PipelineStatusResponse,
+        status_code=status.HTTP_200_OK,
+    )
+    async def reset_pipeline_status() -> PipelineStatusResponse:
+        with PIPELINE_LOCK:
+            if PIPELINE_STATE["status"] == "running":
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Cannot reset while pipeline is running.",
+                )
+            PIPELINE_STATE.update(
+                {
+                    "job_id": None,
+                    "status": "idle",
+                    "started_at": None,
+                    "finished_at": None,
+                    "progress": 0.0,
+                    "current_stage": "idle",
+                    "error": None,
+                    "request": None,
+                    "stats": {
+                        "files": 0,
+                        "parsed_files": 0,
+                        "chunks": 0,
+                        "embeddings": 0,
+                    },
+                    "outputs": {"docs": "", "graph": "", "graph_json": ""},
+                    "events": [],
+                }
+            )
+        return _pipeline_snapshot()
+
+    @app.get(
+        "/api/qdrant/info",
+        response_model=QdrantInfoResponse,
+        status_code=status.HTTP_200_OK,
+    )
+    async def qdrant_info() -> QdrantInfoResponse:
+        return _qdrant_info()
+
+    @app.post(
+        "/api/qdrant/open",
+        response_model=QdrantOpenResponse,
+        status_code=status.HTTP_200_OK,
+    )
+    async def qdrant_open() -> QdrantOpenResponse:
+        url = _qdrant_public_url()
+        return QdrantOpenResponse(status="ok", url=url)
 
     return app
 
