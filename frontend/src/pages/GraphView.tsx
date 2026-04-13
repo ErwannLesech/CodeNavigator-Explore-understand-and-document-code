@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ForceGraph2D from "react-force-graph-2d";
-import { FileCode2, Loader2, Network, X } from "lucide-react";
-import { api, type DiagramItem, type GraphData } from "@/lib/api";
+import { Loader2, X } from "lucide-react";
+import { api, type GraphData } from "@/lib/api";
 
 const NODE_COLORS: Record<string, string> = {
   module: "#4981B9",
@@ -12,89 +12,167 @@ const NODE_COLORS: Record<string, string> = {
 };
 
 const NODE_TYPES = ["module", "class", "function", "table", "column"] as const;
-type GraphTab = "graph" | "diagrams";
+
+interface GraphNode {
+  id: string;
+  label: string;
+  type: string;
+  file?: string;
+}
+
+interface GraphEdge {
+  source: string;
+  target: string;
+  relation: string;
+}
+
+function getEndpointId(endpoint: unknown): string {
+  if (typeof endpoint === "string") return endpoint;
+  if (endpoint && typeof endpoint === "object" && "id" in endpoint) {
+    return String((endpoint as { id: string }).id);
+  }
+  return String(endpoint ?? "");
+}
 
 export default function GraphView() {
-  const [activeTab, setActiveTab] = useState<GraphTab>("graph");
   const [data, setData] = useState<GraphData | null>(null);
-  const [diagrams, setDiagrams] = useState<DiagramItem[]>([]);
-  const [selectedDiagram, setSelectedDiagram] = useState<string | null>(null);
-  const [diagramSvg, setDiagramSvg] = useState<string>("");
-  const [diagramLoading, setDiagramLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [visibleTypes, setVisibleTypes] = useState<Set<string>>(new Set(NODE_TYPES));
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const graphRef = useRef<any>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    Promise.all([api.getGraph(), api.getDiagrams()])
-      .then(([graph, diagramsResponse]) => {
+    api
+      .getGraph()
+      .then((graph) => {
         setData(graph);
-        setDiagrams(diagramsResponse.diagrams);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    if (!selectedDiagram) {
-      setDiagramSvg("");
-      return;
-    }
-
-    let active = true;
-    setDiagramLoading(true);
-    api.getDiagram(selectedDiagram)
-      .then(async (diagram) => {
-        const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({ startOnLoad: false, securityLevel: "loose", theme: "neutral" });
-        const rendered = await mermaid.render(`diagram-${Date.now()}`, diagram.content);
-        if (active) setDiagramSvg(rendered.svg);
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      })
-      .finally(() => {
-        if (active) setDiagramLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [selectedDiagram]);
-
-  useEffect(() => {
     if (!containerRef.current) return;
+    const updateDimensions = () => {
+      if (!containerRef.current) return;
+      const { width, height } = containerRef.current.getBoundingClientRect();
+      setDimensions({ width, height });
+    };
+
+    updateDimensions();
+
     const obs = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       setDimensions({ width, height });
     });
     obs.observe(containerRef.current);
-    return () => obs.disconnect();
+
+    window.addEventListener("resize", updateDimensions);
+    return () => {
+      obs.disconnect();
+      window.removeEventListener("resize", updateDimensions);
+    };
   }, []);
 
-  const filteredData = data
-    ? {
-        nodes: data.nodes.filter((n) => visibleTypes.has(n.type)),
-        links: data.edges
-          .filter(
-            (e) =>
-              data.nodes.find((n) => n.id === String(e.source) && visibleTypes.has(n.type)) &&
-              data.nodes.find((n) => n.id === String(e.target) && visibleTypes.has(n.type))
-          )
-          .map((e) => ({ source: String(e.source), target: String(e.target), relation: e.relation })),
-      }
-    : { nodes: [], links: [] };
+  const nodes = useMemo(() => (data?.nodes ?? []) as GraphNode[], [data]);
+  const edges = useMemo(() => (data?.edges ?? []) as any[], [data]);
 
-  const selectedNode = data?.nodes.find((n) => n.id === selected);
-  const neighbors = data
-    ? data.edges
-        .filter((e) => e.source === selected || e.target === selected)
-        .map((e) => (e.source === selected ? e.target : e.source))
-        .map((id) => data.nodes.find((n) => n.id === id)?.label || id)
-    : [];
+  const nodeById = useMemo(() => {
+    return new Map(nodes.map((node) => [node.id, node]));
+  }, [nodes]);
+
+  const filteredData = useMemo(() => {
+    if (!data) return { nodes: [], links: [] as GraphEdge[] };
+
+    const visibleNodeIds = new Set(
+      nodes.filter((node) => visibleTypes.has(node.type)).map((node) => node.id),
+    );
+
+    return {
+      nodes: nodes.filter((node) => visibleNodeIds.has(node.id)),
+      links: edges
+        .filter(
+          (edge) =>
+            visibleNodeIds.has(String(edge.source)) &&
+            visibleNodeIds.has(String(edge.target)),
+        )
+        .map((edge) => ({
+          source: String(edge.source),
+          target: String(edge.target),
+          relation: String(edge.type ?? edge.relation ?? "related"),
+        })),
+    };
+  }, [data, nodes, edges, visibleTypes]);
+
+  const fitGraph = useCallback((duration = 450, padding = 50) => {
+    if (!graphRef.current) return;
+    graphRef.current.zoomToFit(duration, padding);
+  }, []);
+
+  useEffect(() => {
+    if (!graphRef.current || filteredData.nodes.length === 0) return;
+
+    const timeout = window.setTimeout(() => fitGraph(450, 70), 120);
+    return () => window.clearTimeout(timeout);
+  }, [filteredData.nodes.length, filteredData.links.length, dimensions.width, dimensions.height, fitGraph]);
+
+  const selectedNode = selected ? nodeById.get(selected) : undefined;
+
+  const selectedNeighborhood = useMemo(() => {
+    if (!selectedNode) {
+      return {
+        neighborIds: new Set<string>(),
+        groupedByType: new Map<string, GraphNode[]>(),
+      };
+    }
+
+    const neighborIds = new Set<string>();
+    const groupedByType = new Map<string, GraphNode[]>();
+
+    for (const edge of filteredData.links) {
+      const source = getEndpointId(edge.source);
+      const target = getEndpointId(edge.target);
+      if (source !== selectedNode.id && target !== selectedNode.id) continue;
+
+      const otherId = source === selectedNode.id ? target : source;
+      const otherNode = nodeById.get(otherId);
+      if (!otherNode) continue;
+
+      neighborIds.add(otherId);
+      if (!groupedByType.has(otherNode.type)) {
+        groupedByType.set(otherNode.type, []);
+      }
+      groupedByType.get(otherNode.type)?.push(otherNode);
+    }
+
+    const dedupedGroupedByType = new Map<string, GraphNode[]>();
+    for (const [type, list] of groupedByType) {
+      const seen = new Set<string>();
+      dedupedGroupedByType.set(
+        type,
+        list
+          .filter((node) => {
+            if (seen.has(node.id)) return false;
+            seen.add(node.id);
+            return true;
+          })
+          .sort((a, b) => a.label.localeCompare(b.label)),
+      );
+    }
+
+    return { neighborIds, groupedByType: dedupedGroupedByType };
+  }, [filteredData.links, nodeById, selectedNode]);
+
+  const typeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const node of nodes) {
+      counts.set(node.type, (counts.get(node.type) ?? 0) + 1);
+    }
+    return counts;
+  }, [nodes]);
 
   const toggleType = (t: string) => {
     setVisibleTypes((prev) => {
@@ -106,26 +184,43 @@ export default function GraphView() {
 
   const nodeCanvasObject = useCallback(
     (node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const label = node.label || node.id;
-      const fontSize = 12 / globalScale;
-      const r = 6;
+      const radius = 5;
+      const isFocused = !selected || node.id === selected || selectedNeighborhood.neighborIds.has(node.id);
+
+      ctx.globalAlpha = isFocused ? 1 : 0.16;
       ctx.beginPath();
-      ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
-      ctx.fillStyle = NODE_COLORS[node.type] || "#999";
+      ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = NODE_COLORS[node.type] || "#94a3b8";
       ctx.fill();
+
       if (node.id === selected) {
-        ctx.strokeStyle = "#fff";
+        ctx.strokeStyle = "#ffffff";
         ctx.lineWidth = 2 / globalScale;
         ctx.stroke();
       }
-      ctx.font = `${fontSize}px Inter, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillStyle = "#333";
-      ctx.fillText(label, node.x, node.y + r + 2);
+
+      const shouldRenderLabel = globalScale > 1.45 || node.id === selected;
+      if (shouldRenderLabel) {
+        const fontSize = 11 / globalScale;
+        ctx.font = `${fontSize}px Inter, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = "#334155";
+        ctx.fillText(node.label || node.id, node.x, node.y + radius + 1.5);
+      }
+
+      ctx.globalAlpha = 1;
     },
-    [selected]
+    [selected, selectedNeighborhood.neighborIds],
   );
+
+  const onEngineStop = useCallback(() => {
+    fitGraph(260, 70);
+  }, [fitGraph]);
+
+  const showAllTypes = useCallback(() => {
+    setVisibleTypes(new Set(NODE_TYPES));
+  }, []);
 
   if (loading)
     return (
@@ -146,140 +241,119 @@ export default function GraphView() {
       </div>
     );
 
+  const graphWidth = dimensions.width > 0 ? dimensions.width : window.innerWidth;
+  const graphHeight = dimensions.height > 0 ? dimensions.height : window.innerHeight;
+
   return (
-    <div className="flex h-screen relative">
-      <div className="absolute top-4 right-4 z-10 flex bg-card border rounded-lg overflow-hidden shadow-sm">
-        <button
-          onClick={() => setActiveTab("graph")}
-          className={`px-3 py-2 text-xs font-medium flex items-center gap-1.5 ${
-            activeTab === "graph" ? "bg-primary text-primary-foreground" : "bg-card text-foreground"
-          }`}
-        >
-          <Network className="w-3.5 h-3.5" /> Graph
-        </button>
-        <button
-          onClick={() => setActiveTab("diagrams")}
-          className={`px-3 py-2 text-xs font-medium flex items-center gap-1.5 ${
-            activeTab === "diagrams" ? "bg-primary text-primary-foreground" : "bg-card text-foreground"
-          }`}
-        >
-          <FileCode2 className="w-3.5 h-3.5" /> Diagrams
-        </button>
-      </div>
-
-      {/* Filter bar */}
-      {activeTab === "graph" && (
-      <div className="absolute top-4 left-4 z-10 flex gap-2 bg-card/90 backdrop-blur rounded-lg px-3 py-2 border shadow-sm">
-        {NODE_TYPES.map((t) => (
-          <button
-            key={t}
-            onClick={() => toggleType(t)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              visibleTypes.has(t)
-                ? "text-primary-foreground"
-                : "bg-muted text-muted-foreground"
-            }`}
-            style={visibleTypes.has(t) ? { backgroundColor: NODE_COLORS[t] } : {}}
-          >
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: NODE_COLORS[t] }}
-            />
-            {t}
-          </button>
-        ))}
-      </div>
-      )}
-
-      {/* Graph */}
-      {activeTab === "graph" ? (
-        <div ref={containerRef} className="flex-1">
-          <ForceGraph2D
-            graphData={filteredData}
-            width={dimensions.width - (selected ? 280 : 0)}
-            height={dimensions.height}
-            nodeCanvasObject={nodeCanvasObject}
-            onNodeClick={(node: any) => setSelected(node.id)}
-            onBackgroundClick={() => setSelected(null)}
-            linkColor={() => "hsl(214, 20%, 85%)"}
-            linkWidth={1}
-            cooldownTicks={100}
-          />
+    <div className="relative h-screen w-full overflow-hidden" ref={containerRef}>
+      <div className="absolute top-4 left-4 z-20 rounded-xl border bg-card/95 px-3 py-2 shadow-sm backdrop-blur">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Filtres
         </div>
-      ) : (
-        <div className="flex-1 flex min-h-0">
-          <aside className="w-80 border-r bg-card overflow-y-auto">
-            <div className="px-4 py-3 border-b text-sm font-semibold">Mermaid diagrams</div>
-            <ul className="py-1">
-              {diagrams.map((diagram) => (
-                <li key={diagram.name}>
-                  <button
-                    onClick={() => setSelectedDiagram(diagram.name)}
-                    className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                      selectedDiagram === diagram.name ? "bg-primary/10 text-primary" : "hover:bg-muted"
-                    }`}
-                  >
-                    {diagram.name}
-                  </button>
-                </li>
-              ))}
-              {diagrams.length === 0 && (
-                <li className="px-4 py-3 text-sm text-muted-foreground">No .mermaid files found</li>
-              )}
-            </ul>
-          </aside>
-          <div className="flex-1 overflow-auto p-6 bg-background">
-            {!selectedDiagram ? (
-              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-                Select a Mermaid diagram to preview it
+        <div className="flex max-w-[75vw] flex-wrap gap-2">
+          {NODE_TYPES.map((t) => (
+            <button
+              key={t}
+              onClick={() => toggleType(t)}
+              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                visibleTypes.has(t) ? "text-white" : "bg-muted text-muted-foreground"
+              }`}
+              style={visibleTypes.has(t) ? { backgroundColor: NODE_COLORS[t] } : {}}
+            >
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: NODE_COLORS[t] }} />
+              {t}
+              <span className="opacity-80">{typeCounts.get(t) ?? 0}</span>
+            </button>
+          ))}
+          <button
+            onClick={showAllTypes}
+            className="rounded border px-2.5 py-1 text-xs font-medium hover:bg-muted"
+          >
+            Tout afficher
+          </button>
+        </div>
+      </div>
+
+      {selectedNode && (
+        <div className="absolute right-4 top-4 z-20 w-72 rounded-xl border bg-card/95 p-3 shadow-sm backdrop-blur">
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold">{selectedNode.label}</div>
+              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: NODE_COLORS[selectedNode.type] || "#94a3b8" }}
+                />
+                <span className="capitalize">{selectedNode.type}</span>
               </div>
-            ) : diagramLoading ? (
-              <div className="h-full flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <div className="rounded-lg border bg-card p-4 min-h-full">
-                <div className="mb-3 text-xs text-muted-foreground">{selectedDiagram}</div>
-                <div dangerouslySetInnerHTML={{ __html: diagramSvg }} />
-              </div>
+            </div>
+            <button
+              onClick={() => setSelected(null)}
+              className="rounded p-1 text-muted-foreground hover:bg-muted"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+            Types connectes ({selectedNeighborhood.neighborIds.size})
+          </div>
+          <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+            {NODE_TYPES.map((type) => {
+              const nodesForType = selectedNeighborhood.groupedByType.get(type) ?? [];
+              if (nodesForType.length === 0) return null;
+
+              return (
+                <div key={type}>
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {type} ({nodesForType.length})
+                  </div>
+                  <ul className="space-y-0.5">
+                    {nodesForType.map((node) => (
+                      <li key={node.id} className="truncate text-xs text-foreground">
+                        {node.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+
+            {selectedNeighborhood.neighborIds.size === 0 && (
+              <div className="text-xs text-muted-foreground">Aucun lien visible avec les filtres actuels.</div>
             )}
           </div>
         </div>
       )}
 
-      {/* Detail panel */}
-      {activeTab === "graph" && selectedNode && (
-        <div className="w-72 border-l bg-card p-5 overflow-y-auto">
-          <div className="flex items-start justify-between mb-4">
-            <h3 className="font-semibold text-sm">{selectedNode.label}</h3>
-            <button onClick={() => setSelected(null)}>
-              <X className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
-          <div className="space-y-3">
-            <div>
-              <span className="text-xs text-muted-foreground">Type</span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: NODE_COLORS[selectedNode.type] }}
-                />
-                <span className="text-sm capitalize">{selectedNode.type}</span>
-              </div>
-            </div>
-            <div>
-              <span className="text-xs text-muted-foreground">
-                Connected nodes ({neighbors.length})
-              </span>
-              <ul className="mt-1 space-y-0.5">
-                {neighbors.map((n) => (
-                  <li key={n} className="text-sm font-mono text-foreground">{n}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
+      <ForceGraph2D
+        ref={graphRef}
+        graphData={filteredData}
+        width={graphWidth}
+        height={graphHeight}
+        nodeCanvasObject={nodeCanvasObject}
+        onNodeClick={(node: any) => setSelected(node.id)}
+        onBackgroundClick={() => setSelected(null)}
+        enableNodeDrag={false}
+        cooldownTicks={55}
+        d3AlphaDecay={0.05}
+        d3VelocityDecay={0.45}
+        linkColor={(link: any) => {
+          if (!selected) return "hsl(214, 20%, 82%)";
+          const isNeighbor =
+            String(link.source?.id ?? link.source) === selected ||
+            String(link.target?.id ?? link.target) === selected;
+          return isNeighbor ? "hsl(214, 70%, 45%)" : "hsl(214, 14%, 88%)";
+        }}
+        linkWidth={(link: any) => {
+          if (!selected) return 0.9;
+          const isNeighbor =
+            String(link.source?.id ?? link.source) === selected ||
+            String(link.target?.id ?? link.target) === selected;
+          return isNeighbor ? 1.9 : 0.6;
+        }}
+        onEngineStop={onEngineStop}
+      />
     </div>
   );
 }
