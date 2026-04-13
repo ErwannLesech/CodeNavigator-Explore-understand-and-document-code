@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from src.codeNavigator.embedding.chunker import chunk_parsed_file
 from src.codeNavigator.embedding.embedder import Embedder
 from src.codeNavigator.embedding.vector_store import COLLECTION_NAME, VectorStore
-from src.codeNavigator.generation.assembler import build_project_doc
+from src.codeNavigator.generation.assembler import build_project_doc, estimate_doc_workload
 from src.codeNavigator.generation.doc_generator import DocGenerator
 from src.codeNavigator.generation.exporter import export_to_markdown
 from src.codeNavigator.graph.builder import GraphBuilder
@@ -320,14 +320,8 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
                 progress=64,
             )
 
-        modules_count = len({chunk.source_file for chunk in all_chunks})
-        functions_count = sum(
-            1 for chunk in all_chunks if chunk.chunk_type in {"function", "method"}
-        )
-        classes_count = sum(1 for chunk in all_chunks if chunk.chunk_type == "class")
-        tables_count = sum(1 for chunk in all_chunks if chunk.chunk_type == "table_schema")
-        estimated_llm_calls = (
-            functions_count + classes_count + tables_count + modules_count + 1
+        estimated_llm_calls, modules_count = estimate_doc_workload(
+            all_chunks, DOCS_DETAIL_LEVEL
         )
 
         _append_pipeline_event(
@@ -341,15 +335,28 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
             },
         )
 
-        docs_result: dict[str, Any] = {"ok": False, "error": None}
+        docs_result: dict[str, Any] = {
+            "ok": False,
+            "error": None,
+            "completed": 0,
+            "total": estimated_llm_calls,
+            "last_label": None,
+        }
 
         def _docs_worker() -> None:
             try:
                 generator = DocGenerator()
+
+                def _on_doc_progress(done: int, total: int, label: str) -> None:
+                    docs_result["completed"] = done
+                    docs_result["total"] = total
+                    docs_result["last_label"] = label
+
                 project_doc = build_project_doc(
                     all_chunks,
                     generator,
                     detail_level=DOCS_DETAIL_LEVEL,
+                    progress_callback=_on_doc_progress,
                 )
                 export_to_markdown(project_doc, request.output_docs)
                 docs_result["ok"] = True
@@ -364,18 +371,27 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
         while docs_thread.is_alive():
             time.sleep(docs_heartbeat_seconds)
             docs_elapsed += docs_heartbeat_seconds
-            docs_progress = min(83.5, 70 + (docs_elapsed / 240) * 13.5)
+            completed = int(docs_result.get("completed") or 0)
+            total = int(docs_result.get("total") or estimated_llm_calls)
+            label = docs_result.get("last_label") or "starting"
+            if total > 0 and completed > 0:
+                docs_progress = min(83.5, 70 + (completed / total) * 13.5)
+            else:
+                docs_progress = min(83.5, 70 + (docs_elapsed / 240) * 13.5)
             _append_pipeline_event(
                 stage="docs",
                 message=(
                     "Documentation generation in progress "
-                    f"({docs_elapsed}s elapsed)"
+                    f"({completed}/{total}, {docs_elapsed}s elapsed)"
                 ),
                 progress=docs_progress,
                 details={
                     "estimated_llm_calls": estimated_llm_calls,
                     "output": request.output_docs,
                     "detail_level": DOCS_DETAIL_LEVEL,
+                    "docs_done": completed,
+                    "docs_total": total,
+                    "docs_last_label": label,
                 },
             )
 

@@ -56,3 +56,53 @@ FROM staging.customers;
     assert any(t.name == "customer_dim" for t in query.tables_written)
     assert any(t.name == "customers" for t in query.tables_read)
 
+
+def test_parse_sql_file_handles_sortkey_column_list_in_create_temp_table() -> None:
+    sql = """
+CREATE TEMP TABLE tmp_latest_addon
+DISTSTYLE KEY
+DISTKEY (booking__guest__res_package_hk)
+SORTKEY (booking__guest__res_package_hk, lastchangeddate, snap_date)
+AS
+SELECT booking__guest__res_package_hk
+FROM dv.link_booking__guest__res_package;
+"""
+
+    result = parse_sql_file(
+        source=sql,
+        file_path="redshift_create_temp.sql",
+        dialect="redshift",
+    )
+
+    assert len(result.schemas) == 1
+    assert result.schemas[0].name == "tmp_latest_addon"
+
+    assert len(result.queries) == 1
+    query = result.queries[0]
+    assert query.query_type == "CREATE"
+    assert any(t.name == "tmp_latest_addon" for t in query.tables_written)
+    assert any(t.name == "link_booking__guest__res_package" for t in query.tables_read)
+
+
+def test_parse_sql_file_falls_back_when_dialect_mismatches() -> None:
+    sql = """
+CREATE TEMP TABLE tmp_latest_addon
+DISTSTYLE KEY
+DISTKEY (booking__guest__res_package_hk)
+SORTKEY (booking__guest__res_package_hk, lastchangeddate, snap_date)
+AS
+SELECT booking__guest__res_package_hk
+FROM dv.link_booking__guest__res_package;
+"""
+
+    result = parse_sql_file(
+        source=sql,
+        file_path="redshift_fallback.sql",
+        dialect="mysql",
+    )
+
+    assert len(result.queries) == 1
+    query = result.queries[0]
+    assert query.query_type == "CREATE"
+    assert any(t.name == "tmp_latest_addon" for t in query.tables_written)
+

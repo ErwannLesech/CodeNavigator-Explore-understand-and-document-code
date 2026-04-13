@@ -104,6 +104,8 @@ export default function PipelineView() {
     return [...events].reverse();
   }, [status?.events]);
 
+  const clampedProgress = Math.max(0, Math.min(100, status?.progress ?? 0));
+
   return (
     <div className="h-screen overflow-y-auto px-6 py-6 bg-background">
       <div className="max-w-6xl mx-auto space-y-5">
@@ -253,9 +255,9 @@ export default function PipelineView() {
               <div className="space-y-1">
                 <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full transition-all"
+                    className="h-full w-full origin-left transition-transform"
                     style={{
-                      width: `${Math.max(0, Math.min(100, status.progress))}%`,
+                      transform: `scaleX(${clampedProgress / 100})`,
                       backgroundImage:
                         "linear-gradient(90deg, #0057B8 0%, #EA4C89 52%, #22A55D 100%)",
                     }}

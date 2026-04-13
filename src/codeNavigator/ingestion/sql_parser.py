@@ -1,8 +1,13 @@
 ﻿# ingestion/sql_parser.py
 import sqlglot
 import sqlglot.expressions as exp
+import logging
 from dataclasses import dataclass
 from typing import Optional
+
+
+logger = logging.getLogger(__name__)
+logging.getLogger("sqlglot").setLevel(logging.ERROR)
 
 
 @dataclass
@@ -49,12 +54,36 @@ class SqlFileInfo:
     source_file: str
 
 
+def _candidate_dialects(dialect: str) -> list[str]:
+    ordered = [dialect, "redshift", "postgres", "snowflake", "mysql", "ansi"]
+    seen: set[str] = set()
+    candidates: list[str] = []
+    for item in ordered:
+        value = (item or "").strip().lower()
+        if value and value not in seen:
+            seen.add(value)
+            candidates.append(value)
+    return candidates
+
+
+def _has_supported_sql_statements(statements: list[exp.Expression | None]) -> bool:
+    supported = (exp.Create, exp.Select, exp.Insert, exp.Update, exp.Delete, exp.Merge)
+    return any(isinstance(stmt, supported) for stmt in statements if stmt is not None)
+
+
 def _extract_table_ref(table_expr) -> TableRef:
     return TableRef(
         name=table_expr.name,
         alias=table_expr.alias or None,
         schema=table_expr.db or None,
     )
+
+
+def _safe_stmt_sql(stmt: exp.Expression) -> str:
+    try:
+        return stmt.sql()
+    except Exception:
+        return repr(stmt)
 
 
 def _parse_create_table(stmt) -> Optional[TableSchema]:
@@ -139,17 +168,24 @@ def _parse_query(stmt) -> QueryInfo:
             return [_extract_table_ref(table_expr.this)]
         return []
 
+    def _table_refs_from_expr_arg(expression: object | None) -> list[TableRef]:
+        if isinstance(expression, exp.Expression):
+            return [_extract_table_ref(t) for t in expression.find_all(exp.Table)]
+        if isinstance(expression, list):
+            refs: list[TableRef] = []
+            for item in expression:
+                if isinstance(item, exp.Expression):
+                    refs.extend(_extract_table_ref(t) for t in item.find_all(exp.Table))
+            return refs
+        return []
+
     if isinstance(stmt, exp.Select):
         _add_unique(tables_read, [_extract_table_ref(t) for t in stmt.find_all(exp.Table)])
 
     elif isinstance(stmt, exp.Insert):
         _add_unique(tables_written, _table_expr_ref(stmt.this))
         expression = stmt.args.get("expression")
-        if expression is not None:
-            _add_unique(
-                tables_read,
-                [_extract_table_ref(t) for t in expression.find_all(exp.Table)],
-            )
+        _add_unique(tables_read, _table_refs_from_expr_arg(expression))
 
     elif isinstance(stmt, exp.Update):
         written = _table_expr_ref(stmt.this)
@@ -194,11 +230,7 @@ def _parse_query(stmt) -> QueryInfo:
         # CREATE TABLE ... AS SELECT ...
         _add_unique(tables_written, _table_expr_ref(stmt.this))
         expression = stmt.args.get("expression")
-        if expression is not None:
-            _add_unique(
-                tables_read,
-                [_extract_table_ref(t) for t in expression.find_all(exp.Table)],
-            )
+        _add_unique(tables_read, _table_refs_from_expr_arg(expression))
 
     else:
         _add_unique(tables_read, [_extract_table_ref(t) for t in stmt.find_all(exp.Table)])
@@ -221,7 +253,7 @@ def _parse_query(stmt) -> QueryInfo:
         tables_written=tables_written,
         columns_referenced=columns,
         joins=joins,
-        raw_sql=stmt.sql(),
+        raw_sql=_safe_stmt_sql(stmt),
     )
 
 
@@ -233,27 +265,57 @@ def parse_sql_file(source: str, file_path: str, dialect: str = "ansi") -> SqlFil
     schemas = []
     queries = []
 
-    try:
-        statements = sqlglot.parse(
-            source, dialect=dialect, error_level=sqlglot.ErrorLevel.WARN
-        )
-    except Exception:
+    statements: list[exp.Expression | None] = []
+    fallback_statements: list[exp.Expression | None] = []
+    for candidate in _candidate_dialects(dialect):
+        try:
+            parsed = sqlglot.parse(
+                source,
+                dialect=candidate,
+                error_level=sqlglot.ErrorLevel.IGNORE,
+            )
+            if not parsed:
+                continue
+            if _has_supported_sql_statements(parsed):
+                statements = parsed
+                break
+            if not fallback_statements:
+                fallback_statements = parsed
+        except Exception:
+            continue
+
+    if not statements:
+        statements = fallback_statements
+
+    if not statements:
         # En cas d'erreur fatale, on retourne un r�sultat vide plut�t que de crasher
         return SqlFileInfo(schemas=[], queries=[], source_file=file_path)
 
     for stmt in statements:
         if stmt is None:
             continue
-        if isinstance(stmt, exp.Create) and stmt.find(exp.Table):
-            schema = _parse_create_table(stmt)
-            if schema:
-                schemas.append(schema)
-        if isinstance(
-            stmt, (exp.Select, exp.Insert, exp.Update, exp.Delete, exp.Merge)
-        ) or (
-            isinstance(stmt, exp.Create) and stmt.find(exp.Table) and stmt.args.get("expression") is not None
-        ):
-            queries.append(_parse_query(stmt))
+        try:
+            if isinstance(stmt, exp.Create) and stmt.find(exp.Table):
+                schema = _parse_create_table(stmt)
+                if schema:
+                    schemas.append(schema)
+            if isinstance(
+                stmt, (exp.Select, exp.Insert, exp.Update, exp.Delete, exp.Merge)
+            ) or (
+                isinstance(stmt, exp.Create)
+                and stmt.find(exp.Table)
+                and stmt.args.get("expression") is not None
+            ):
+                queries.append(_parse_query(stmt))
+        except Exception as exc:
+            # Some dialect-specific properties can be represented with unsupported
+            # AST arg shapes (for example list-valued expressions). Skip statement.
+            logger.warning(
+                "Skipping unsupported SQL statement while parsing %s: %s",
+                file_path,
+                exc,
+            )
+            continue
 
     return SqlFileInfo(schemas=schemas, queries=queries, source_file=file_path)
 

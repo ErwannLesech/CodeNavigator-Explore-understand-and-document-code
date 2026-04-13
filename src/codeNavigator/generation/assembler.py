@@ -1,5 +1,6 @@
 ﻿from dataclasses import dataclass
 from collections import defaultdict
+from typing import Callable
 
 from src.codeNavigator.embedding.chunker import Chunk
 from src.codeNavigator.generation.doc_generator import DocGenerator
@@ -44,14 +45,42 @@ def _component_summaries_for_compact(chunks: list[Chunk], limit: int = 20) -> li
     return summaries
 
 
+def estimate_doc_workload(chunks: list[Chunk], detail_level: str = "compact") -> tuple[int, int]:
+    grouped = _group_chunks_by_file(chunks)
+    module_count = len(grouped)
+    compact_mode = detail_level.lower() != "full"
+
+    if compact_mode:
+        # 1 appel LLM par module + 1 appel pour la vue projet
+        return module_count + 1, module_count
+
+    functions = sum(1 for c in chunks if c.chunk_type == "function")
+    methods = sum(1 for c in chunks if c.chunk_type == "method")
+    classes = sum(1 for c in chunks if c.chunk_type == "class")
+    tables = sum(1 for c in chunks if c.chunk_type == "table_schema")
+
+    # Mode full: fonctions + methodes + classes + tables + modules + projet
+    total = functions + methods + classes + tables + module_count + 1
+    return total, module_count
+
+
 def build_project_doc(
     chunks: list[Chunk],
     generator: DocGenerator,
     detail_level: str = "compact",
+    progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> ProjectDoc:
     grouped = _group_chunks_by_file(chunks)
     module_docs = []
     compact_mode = detail_level.lower() != "full"
+    total_steps, _ = estimate_doc_workload(chunks, detail_level)
+    completed_steps = 0
+
+    def _notify_progress(label: str) -> None:
+        nonlocal completed_steps
+        completed_steps += 1
+        if progress_callback is not None:
+            progress_callback(completed_steps, total_steps, label)
 
     for file_path, file_chunks in grouped.items():
         # Trier les chunks par type pour respecter l'ordre de g�n�ration
@@ -70,6 +99,7 @@ def build_project_doc(
             for chunk in functions:
                 name = chunk.metadata.get("name", chunk.chunk_id)
                 function_docs[name] = generator.document_function(chunk)
+                _notify_progress(f"function:{name}")
 
         # 2. M�thodes group�es par classe
         methods_by_class: dict[str, list[Chunk]] = defaultdict(list)
@@ -88,6 +118,7 @@ def build_project_doc(
                 class_docs[class_name] = generator.document_class(
                     chunk, related_method_docs
                 )
+                _notify_progress(f"class:{class_name}")
 
                 # Documenter les m�thodes individuellement aussi
                 for method_chunk in methods_by_class.get(class_name, []):
@@ -95,11 +126,13 @@ def build_project_doc(
                     function_docs[f"{class_name}.{method_name}"] = (
                         generator.document_function(method_chunk)
                     )
+                    _notify_progress(f"method:{class_name}.{method_name}")
 
             # 4. Tables SQL
             for chunk in tables:
                 table_name = chunk.metadata.get("table_name", chunk.chunk_id)
                 table_docs[table_name] = generator.document_table(chunk)
+                _notify_progress(f"table:{table_name}")
 
         # 5. Module-level
         imports = _get_imports_from_chunks(file_chunks)
@@ -118,6 +151,7 @@ def build_project_doc(
             class_docs=[] if compact_mode else list(class_docs.values()),
             imports=imports,
         )
+        _notify_progress(f"module:{file_path}")
 
         module_docs.append(
             ModuleDoc(
@@ -139,6 +173,7 @@ def build_project_doc(
         for m in module_docs
     ]
     project_overview = generator.document_project(modules_summary)
+    _notify_progress("project_overview")
 
     return ProjectDoc(project_overview=project_overview, modules=module_docs)
 
