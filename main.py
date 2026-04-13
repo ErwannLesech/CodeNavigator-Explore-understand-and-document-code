@@ -1,17 +1,20 @@
 import argparse
-from embedding.indexer import run_indexing
-from generation.assembler import build_project_doc
-from generation.doc_generator import DocGenerator
-from generation.exporter import export_to_markdown
-from rich import print
+import os
+from src.codeNavigator.embedding.indexer import run_indexing
+from src.codeNavigator.generation.assembler import build_project_doc
+from src.codeNavigator.generation.doc_generator import DocGenerator
+from src.codeNavigator.generation.exporter import export_to_markdown
 
-from ingestion.repo_walker import walk_repo
-from ingestion.parser_dispatcher import dispatch_parser
-from graph.builder import GraphBuilder
-from graph.mermaid_exporter import export_all_diagrams
-from graph.json_exporter import export_graph_json
+from src.codeNavigator.ingestion.repo_walker import walk_repo
+from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
+from src.codeNavigator.graph.builder import GraphBuilder
+from src.codeNavigator.graph.mermaid_exporter import export_all_diagrams
+from src.codeNavigator.graph.json_exporter import export_graph_json
 
-from rag.cli import run_chat_cli
+from src.codeNavigator.rag.cli import run_chat_cli
+
+
+DOCS_DETAIL_LEVEL = os.getenv("DOCS_DETAIL_LEVEL", "compact")
 
 
 def main():
@@ -59,9 +62,12 @@ def main():
     elif args.command == "generate":
         chunks = run_indexing(args.repo, sql_dialect=args.dialect, dry_run=True)
         generator = DocGenerator()
-        project_doc = build_project_doc(chunks, generator)
-        files = export_to_markdown(project_doc, args.output)
-        print(f"[green]{len(files)} fichiers generes dans {args.output}[/green]")
+        project_doc = build_project_doc(
+            chunks,
+            generator,
+            detail_level=DOCS_DETAIL_LEVEL,
+        )
+        export_to_markdown(project_doc, args.output)
 
     elif args.command == "graph":
         files = list(walk_repo(args.repo))
@@ -73,22 +79,20 @@ def main():
         nodes = builder.get_nodes()
         edges = builder.get_edges()
 
-        diagrams = export_all_diagrams(nodes, edges, output_dir=args.output)
+        export_all_diagrams(nodes, edges, output_dir=args.output)
         export_graph_json(nodes, edges, output_path=f"{args.output}/graph.json")
-
-        print(f"[green]{len(nodes)} noeuds, {len(edges)} aretes[/green]")
-        print(f"[green]{len(diagrams)} diagrammes generes dans {args.output}[/green]")
 
     elif args.command == "full":
         chunks = run_indexing(
             args.repo, recreate_collection=args.recreate, sql_dialect=args.dialect
         )
         generator = DocGenerator()
-        project_doc = build_project_doc(chunks, generator)
-        files = export_to_markdown(project_doc, args.output)
-        print(
-            f"[green]Pipeline complet termine. {len(files)} fichiers dans {args.output}[/green]"
+        project_doc = build_project_doc(
+            chunks,
+            generator,
+            detail_level=DOCS_DETAIL_LEVEL,
         )
+        export_to_markdown(project_doc, args.output)
 
     elif args.command == "chat":
         run_chat_cli(graph_json_path=args.graph)

@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from ingestion.parser_dispatcher import dispatch_parser
-from ingestion.repo_walker import SourceFile
+from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
+from src.codeNavigator.ingestion.repo_walker import SourceFile
 
 
 def test_dispatch_parser_python_route() -> None:

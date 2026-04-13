@@ -1,8 +1,4 @@
-import logging
 from pathlib import Path
-
-logging.basicConfig(level=logging.INFO)
-LOGGER = logging.getLogger(__name__)
 
 SQL_FOLDERS = ["sql/bronze", "sql/silver", "sql/gold"]
 
@@ -21,8 +17,7 @@ def handler(event: dict, context: object) -> dict:
 
     executed: list[str] = []
     for sql_file in sql_files:
-        sql_text = sql_file.read_text(encoding="utf-8")
-        LOGGER.info("Executing %s (%d chars)", sql_file, len(sql_text))
+        sql_file.read_text(encoding="utf-8")
         executed.append(str(sql_file.relative_to(repo_root)))
 
     return {
@@ -33,5 +28,4 @@ def handler(event: dict, context: object) -> dict:
 
 
 if __name__ == "__main__":
-    result = handler({}, None)
-    LOGGER.info("Load result: %s", result)
+    handler({}, None)

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ingestion.repo_walker import walk_repo
+from src.codeNavigator.ingestion.repo_walker import walk_repo
 
 
 def test_walk_repo_filters_by_extension_and_ignored_dirs(tmp_path: Path) -> None:
