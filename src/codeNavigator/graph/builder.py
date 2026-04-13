@@ -1,4 +1,4 @@
-﻿# graph/builder.py
+# graph/builder.py
 import re
 import networkx as nx
 from src.codeNavigator.ingestion.parser_dispatcher import ParsedFile
@@ -310,6 +310,3 @@ class GraphBuilder:
 
     def get_edges(self) -> list[Edge]:
         return self._edges
-
-
-

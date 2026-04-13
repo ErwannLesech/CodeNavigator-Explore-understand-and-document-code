@@ -1,10 +1,13 @@
-﻿# ingestion/parser_dispatcher.py
+# ingestion/parser_dispatcher.py
 from dataclasses import dataclass
 from typing import Optional
 from src.codeNavigator.ingestion.repo_walker import SourceFile
 from src.codeNavigator.ingestion.python_parser import parse_python_file, ModuleInfo
 from src.codeNavigator.ingestion.sql_parser import parse_sql_file, SqlFileInfo
-from src.codeNavigator.ingestion.treesitter_parser import parse_with_treesitter, TreeSitterResult
+from src.codeNavigator.ingestion.treesitter_parser import (
+    parse_with_treesitter,
+    TreeSitterResult,
+)
 
 
 @dataclass
@@ -47,4 +50,3 @@ def dispatch_parser(source_file: SourceFile, sql_dialect: str = "ansi") -> Parse
         source_file.content, source_file.language, source_file.relative_path
     )
     return result
-

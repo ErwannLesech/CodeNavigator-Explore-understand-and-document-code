@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
 
 
@@ -37,5 +37,3 @@ class Edge:
     target: str
     edge_type: EdgeType
     metadata: dict = field(default_factory=dict)
-
-

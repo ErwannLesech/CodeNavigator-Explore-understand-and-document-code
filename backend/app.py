@@ -17,7 +17,10 @@ from pydantic import BaseModel
 from src.codeNavigator.embedding.chunker import chunk_parsed_file
 from src.codeNavigator.embedding.embedder import Embedder
 from src.codeNavigator.embedding.vector_store import COLLECTION_NAME, VectorStore
-from src.codeNavigator.generation.assembler import build_project_doc, estimate_doc_workload
+from src.codeNavigator.generation.assembler import (
+    build_project_doc,
+    estimate_doc_workload,
+)
 from src.codeNavigator.generation.doc_generator import DocGenerator
 from src.codeNavigator.generation.exporter import export_to_markdown
 from src.codeNavigator.graph.builder import GraphBuilder
@@ -199,7 +202,9 @@ def _pipeline_snapshot() -> PipelineStatusResponse:
             progress=float(PIPELINE_STATE["progress"]),
             current_stage=PIPELINE_STATE["current_stage"],
             error=PIPELINE_STATE["error"],
-            request=dict(PIPELINE_STATE["request"]) if PIPELINE_STATE["request"] else None,
+            request=dict(PIPELINE_STATE["request"])
+            if PIPELINE_STATE["request"]
+            else None,
             stats=dict(PIPELINE_STATE["stats"]),
             outputs=dict(PIPELINE_STATE["outputs"]),
             events=[PipelineEvent(**event) for event in PIPELINE_STATE["events"]],
@@ -725,7 +730,9 @@ def _related_docs(module_name: str) -> list[DocModule]:
                 None,
             )
             if other_node and other_node.get("type") == "module":
-                neighbor_module_labels.add(_normalize_path(str(other_node.get("label", ""))))
+                neighbor_module_labels.add(
+                    _normalize_path(str(other_node.get("label", "")))
+                )
 
     related: list[DocModule] = []
     for raw in sorted(neighbor_module_labels):
@@ -759,7 +766,9 @@ def create_app() -> FastAPI:
     async def health() -> HealthResponse:
         return HealthResponse(status="ok")
 
-    @app.get("/api/docs", response_model=DocsListResponse, status_code=status.HTTP_200_OK)
+    @app.get(
+        "/api/docs", response_model=DocsListResponse, status_code=status.HTTP_200_OK
+    )
     async def list_docs() -> DocsListResponse:
         globals_docs = _list_global_docs()
         modules = _list_doc_modules()
@@ -798,7 +807,9 @@ def create_app() -> FastAPI:
     async def get_graph() -> GraphResponse:
         return _read_graph()
 
-    @app.get("/api/diagrams", response_model=DiagramsResponse, status_code=status.HTTP_200_OK)
+    @app.get(
+        "/api/diagrams", response_model=DiagramsResponse, status_code=status.HTTP_200_OK
+    )
     async def get_diagrams() -> DiagramsResponse:
         return DiagramsResponse(diagrams=_list_diagrams())
 

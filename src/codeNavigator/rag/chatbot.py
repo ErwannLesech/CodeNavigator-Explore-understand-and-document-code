@@ -1,4 +1,4 @@
-﻿# rag/chatbot.py
+# rag/chatbot.py
 import os
 import time
 from dataclasses import dataclass
@@ -128,7 +128,11 @@ class CodeNavigatorChatbot:
             prompt_tokens = getattr(usage, "input_tokens", None)
         if completion_tokens is None and usage is not None:
             completion_tokens = getattr(usage, "output_tokens", None)
-        if total_tokens is None and prompt_tokens is not None and completion_tokens is not None:
+        if (
+            total_tokens is None
+            and prompt_tokens is not None
+            and completion_tokens is not None
+        ):
             total_tokens = prompt_tokens + completion_tokens
 
         debug_contexts = [
@@ -166,6 +170,3 @@ class CodeNavigatorChatbot:
 
     def reset(self):
         self.history.clear()
-
-
-

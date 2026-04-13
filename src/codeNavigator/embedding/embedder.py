@@ -1,4 +1,4 @@
-﻿# embedding/embedder.py
+# embedding/embedder.py
 import os
 import time
 from mistralai import Mistral
@@ -50,6 +50,3 @@ class Embedder:
         if embedding is None:
             raise RuntimeError("Embedding API returned an empty vector")
         return embedding
-
-
-

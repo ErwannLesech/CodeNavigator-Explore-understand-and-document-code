@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 import time
 from typing import Optional
@@ -30,7 +30,12 @@ class DocGenerator:
     @staticmethod
     def _sanitize_markdown_response(content: str) -> str:
         cleaned = content.strip()
-        cleaned = re.sub(r"```(?:markdown|md)\\s*\\n([\\s\\S]*?)```", r"\1", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(
+            r"```(?:markdown|md)\\s*\\n([\\s\\S]*?)```",
+            r"\1",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
 
         wrapped = re.match(r"^```[\\w-]*\\s*\\n([\\s\\S]*?)\\n```$", cleaned)
         if wrapped:
@@ -89,6 +94,3 @@ class DocGenerator:
 
     def document_project(self, modules_summary: list[dict]) -> str:
         return self._call(prompt_for_project(modules_summary), max_tokens=520)
-
-
-

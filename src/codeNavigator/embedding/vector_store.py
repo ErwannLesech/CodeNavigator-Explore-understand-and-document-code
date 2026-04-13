@@ -1,4 +1,4 @@
-﻿# embedding/vector_store.py
+# embedding/vector_store.py
 import os
 
 from qdrant_client import QdrantClient
@@ -129,6 +129,3 @@ class VectorStore:
             )
 
         return formatted_results
-
-
-

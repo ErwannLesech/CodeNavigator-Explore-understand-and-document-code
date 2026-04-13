@@ -1,4 +1,4 @@
-﻿# rag/graph_context.py
+# rag/graph_context.py
 import json
 from pathlib import Path
 from src.codeNavigator.rag.retriever import RetrievedContext
@@ -97,7 +97,9 @@ class GraphContextProvider:
         return "\n".join(lines) if lines else ""
 
     def get_context_for_query(self, query: str, max_nodes: int = 6) -> str:
-        terms = [t.strip().lower() for t in query.replace("_", " ").split() if len(t) >= 3]
+        terms = [
+            t.strip().lower() for t in query.replace("_", " ").split() if len(t) >= 3
+        ]
         if not terms:
             return ""
 
@@ -121,7 +123,9 @@ class GraphContextProvider:
             if not isinstance(node_id, str):
                 continue
 
-            lines.append(f"Node: {node.get('label', node_id)} ({node.get('type', 'unknown')})")
+            lines.append(
+                f"Node: {node.get('label', node_id)} ({node.get('type', 'unknown')})"
+            )
             outgoing = [e for e in self.edges if e.get("source") == node_id][:4]
             incoming = [e for e in self.edges if e.get("target") == node_id][:4]
 
@@ -137,6 +141,3 @@ class GraphContextProvider:
                 )
 
         return "\n".join(lines)
-
-
-

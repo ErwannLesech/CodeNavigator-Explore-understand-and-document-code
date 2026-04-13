@@ -1,4 +1,4 @@
-﻿"""
+"""
 review.py
 
 Shared review logic for both pipelines.

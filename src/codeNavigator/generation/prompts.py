@@ -1,4 +1,4 @@
-﻿from src.codeNavigator.embedding.chunker import Chunk
+from src.codeNavigator.embedding.chunker import Chunk
 
 
 SYSTEM_PROMPT = """Tu es un ingenieur logiciel senior charge de rediger de la documentation technique.
@@ -191,7 +191,9 @@ Regles:
 def prompt_rag(query: str, context: str, graph_context: str = "") -> str:
     graph_section = ""
     if graph_context:
-        graph_section = f"\n## Contexte de dependances (graphe de connaissances)\n{graph_context}\n"
+        graph_section = (
+            f"\n## Contexte de dependances (graphe de connaissances)\n{graph_context}\n"
+        )
 
     return f"""## Contexte recupere
 {context}
@@ -200,4 +202,3 @@ def prompt_rag(query: str, context: str, graph_context: str = "") -> str:
 {query}
 
 Reponds uniquement avec le contexte ci-dessus. Cite les sources avec [Source N]."""
-

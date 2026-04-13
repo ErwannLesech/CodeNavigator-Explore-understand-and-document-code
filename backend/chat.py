@@ -1,4 +1,4 @@
-﻿# backend/chat.py
+# backend/chat.py
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from src.codeNavigator.rag.chatbot import CodeNavigatorChatbot
@@ -80,6 +80,3 @@ def chat(request: ChatRequest):
 def reset_chat():
     get_chatbot().reset()
     return ResetResponseDTO(status="ok")
-
-
-

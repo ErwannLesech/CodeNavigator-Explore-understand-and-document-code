@@ -1,4 +1,4 @@
-﻿# graph/mermaid_exporter.py
+# graph/mermaid_exporter.py
 from src.codeNavigator.graph.models import Node, NodeType, EdgeType
 import re
 
@@ -236,6 +236,3 @@ def export_all_diagrams(
         diagrams[f"classes_{safe}"] = diagram
 
     return diagrams
-
-
-

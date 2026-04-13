@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
 from src.codeNavigator.ingestion.repo_walker import SourceFile
@@ -49,4 +49,3 @@ def test_dispatch_parser_treesitter_route_is_safe() -> None:
     assert result.python_info is None
     assert result.sql_info is None
     assert result.ts_result is None or result.ts_result.language == "javascript"
-

@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from src.codeNavigator.generation.assembler import ProjectDoc
 
 
@@ -63,4 +63,3 @@ def export_to_markdown(project_doc: ProjectDoc, output_dir: str) -> list[Path]:
     written.append(index)
 
     return written
-

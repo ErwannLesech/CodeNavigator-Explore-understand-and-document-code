@@ -1,4 +1,4 @@
-﻿# embedding/indexer.py
+# embedding/indexer.py
 from src.codeNavigator.ingestion.repo_walker import walk_repo
 from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
 from src.codeNavigator.embedding.chunker import chunk_parsed_file, Chunk
@@ -36,4 +36,3 @@ def run_indexing(
     embeddings = embedder.embed_chunks(all_chunks)
     store.upsert_chunks(all_chunks, embeddings)
     return all_chunks
-

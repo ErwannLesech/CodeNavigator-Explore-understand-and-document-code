@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 import os
 from src.codeNavigator.embedding.indexer import run_indexing
 from src.codeNavigator.generation.assembler import build_project_doc
@@ -100,4 +100,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -1,4 +1,4 @@
-﻿# rag/cli.py
+# rag/cli.py
 from rich import print
 from rich.panel import Panel
 from rich.prompt import Prompt
@@ -50,6 +50,3 @@ def run_chat_cli(graph_json_path: Optional[str] = None):
                 print(
                     f"  [dim][{i}] {src.source_file} ({src.chunk_type}) � score: {src.score:.3f}[/dim]"
                 )
-
-
-

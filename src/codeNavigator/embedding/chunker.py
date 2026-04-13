@@ -1,4 +1,4 @@
-﻿# embedding/chunker.py
+# embedding/chunker.py
 from dataclasses import dataclass, field
 from typing import Optional
 from src.codeNavigator.ingestion.parser_dispatcher import ParsedFile
@@ -205,6 +205,3 @@ def chunk_parsed_file(parsed: ParsedFile) -> list[Chunk]:
             chunks.append(_format_sql_query(query, file_path, i))
 
     return chunks
-
-
-

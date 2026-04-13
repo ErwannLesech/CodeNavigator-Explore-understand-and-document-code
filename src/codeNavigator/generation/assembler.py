@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass
+from dataclasses import dataclass
 from collections import defaultdict
 from typing import Callable
 
@@ -38,14 +38,20 @@ def _get_imports_from_chunks(chunks: list[Chunk]) -> list[str]:
 def _component_summaries_for_compact(chunks: list[Chunk], limit: int = 20) -> list[str]:
     summaries: list[str] = []
     for chunk in chunks:
-        name = chunk.metadata.get("name") or chunk.metadata.get("table_name") or chunk.chunk_id
+        name = (
+            chunk.metadata.get("name")
+            or chunk.metadata.get("table_name")
+            or chunk.chunk_id
+        )
         summaries.append(f"- {chunk.chunk_type}: {name}")
         if len(summaries) >= limit:
             break
     return summaries
 
 
-def estimate_doc_workload(chunks: list[Chunk], detail_level: str = "compact") -> tuple[int, int]:
+def estimate_doc_workload(
+    chunks: list[Chunk], detail_level: str = "compact"
+) -> tuple[int, int]:
     grouped = _group_chunks_by_file(chunks)
     module_count = len(grouped)
     compact_mode = detail_level.lower() != "full"
@@ -122,7 +128,9 @@ def build_project_doc(
 
                 # Documenter les m�thodes individuellement aussi
                 for method_chunk in methods_by_class.get(class_name, []):
-                    method_name = method_chunk.metadata.get("name", method_chunk.chunk_id)
+                    method_name = method_chunk.metadata.get(
+                        "name", method_chunk.chunk_id
+                    )
                     function_docs[f"{class_name}.{method_name}"] = (
                         generator.document_function(method_chunk)
                     )
@@ -176,6 +184,3 @@ def build_project_doc(
     _notify_progress("project_overview")
 
     return ProjectDoc(project_overview=project_overview, modules=module_docs)
-
-
-

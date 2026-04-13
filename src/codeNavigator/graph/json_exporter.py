@@ -1,4 +1,4 @@
-﻿# graph/json_exporter.py
+# graph/json_exporter.py
 import json
 from pathlib import Path
 from src.codeNavigator.graph.models import Node, Edge
@@ -40,4 +40,3 @@ def export_graph_json(
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     Path(output_path).write_text(json.dumps(data, indent=2), encoding="utf-8")
     return data
-

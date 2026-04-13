@@ -1,4 +1,4 @@
-﻿# rag/retriever.py
+# rag/retriever.py
 from dataclasses import dataclass
 from typing import Optional
 from src.codeNavigator.embedding.embedder import Embedder
@@ -63,6 +63,3 @@ class Retriever:
                 f"[Source {i}] {ctx.source_file} ({ctx.chunk_type})\n{ctx.content}"
             )
         return "\n\n---\n\n".join(parts)
-
-
-

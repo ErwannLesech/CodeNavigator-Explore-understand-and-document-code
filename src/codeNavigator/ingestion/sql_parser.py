@@ -1,4 +1,4 @@
-﻿# ingestion/sql_parser.py
+# ingestion/sql_parser.py
 import sqlglot
 import sqlglot.expressions as exp
 import logging
@@ -164,7 +164,9 @@ def _parse_query(stmt) -> QueryInfo:
     def _table_expr_ref(table_expr: object | None) -> list[TableRef]:
         if isinstance(table_expr, exp.Table):
             return [_extract_table_ref(table_expr)]
-        if isinstance(table_expr, exp.Schema) and isinstance(table_expr.this, exp.Table):
+        if isinstance(table_expr, exp.Schema) and isinstance(
+            table_expr.this, exp.Table
+        ):
             return [_extract_table_ref(table_expr.this)]
         return []
 
@@ -180,7 +182,9 @@ def _parse_query(stmt) -> QueryInfo:
         return []
 
     if isinstance(stmt, exp.Select):
-        _add_unique(tables_read, [_extract_table_ref(t) for t in stmt.find_all(exp.Table)])
+        _add_unique(
+            tables_read, [_extract_table_ref(t) for t in stmt.find_all(exp.Table)]
+        )
 
     elif isinstance(stmt, exp.Insert):
         _add_unique(tables_written, _table_expr_ref(stmt.this))
@@ -233,7 +237,9 @@ def _parse_query(stmt) -> QueryInfo:
         _add_unique(tables_read, _table_refs_from_expr_arg(expression))
 
     else:
-        _add_unique(tables_read, [_extract_table_ref(t) for t in stmt.find_all(exp.Table)])
+        _add_unique(
+            tables_read, [_extract_table_ref(t) for t in stmt.find_all(exp.Table)]
+        )
 
     # JOINs explicites
     for join in stmt.find_all(exp.Join):
@@ -318,5 +324,3 @@ def parse_sql_file(source: str, file_path: str, dialect: str = "ansi") -> SqlFil
             continue
 
     return SqlFileInfo(schemas=schemas, queries=queries, source_file=file_path)
-
-

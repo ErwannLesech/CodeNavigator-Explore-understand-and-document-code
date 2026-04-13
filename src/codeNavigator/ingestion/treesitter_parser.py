@@ -1,4 +1,4 @@
-﻿# ingestion/treesitter_parser.py
+# ingestion/treesitter_parser.py
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -212,5 +212,3 @@ def parse_with_treesitter(
     except Exception:
         # Ne pas faire crasher le pipeline si un fichier pose probl�me
         return None
-
-

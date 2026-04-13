@@ -1,4 +1,4 @@
-﻿from src.codeNavigator.ingestion.sql_parser import parse_sql_file
+from src.codeNavigator.ingestion.sql_parser import parse_sql_file
 
 
 def test_parse_sql_file_extracts_schema_and_query() -> None:
@@ -105,4 +105,3 @@ FROM dv.link_booking__guest__res_package;
     query = result.queries[0]
     assert query.query_type == "CREATE"
     assert any(t.name == "tmp_latest_addon" for t in query.tables_written)
-
