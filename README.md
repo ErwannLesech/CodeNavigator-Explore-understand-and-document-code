@@ -22,7 +22,7 @@ CodeNavigator est un outil d'exploration de code qui automatise:
 - Parsing specialise Python et SQL + fallback Tree-sitter.
 - Chunking et indexation vectorielle pour la recherche semantique.
 - Generation de docs projet/modules/fichiers au format Markdown.
-- Export de graphes en JSON et diagrammes Mermaid.
+- Export de graphes en JSON.
 - Chat RAG en CLI et endpoint FastAPI reutilisable.
 
 ## Structure du projet
@@ -46,7 +46,6 @@ CodeNavigator/
 |     |- graph/
 |     |  |- builder.py
 |     |  |- json_exporter.py
-|     |  |- mermaid_exporter.py
 |     |  `- models.py
 |     |- ingestion/
 |     |  |- parser_dispatcher.py
@@ -216,23 +215,3 @@ Executer la suite de tests:
 ```bash
 pytest -q
 ```
-
-Les tests actuels couvrent principalement le module ingestion.
-
-## Sorties generees
-
-- Documentation: data/output/docs/
-- Graphe et diagrammes: data/output/graph/
-- Index vectoriel local (Qdrant): data/qdrant_local/
-
-## Depannage
-
-- Erreur MISTRAL_API_KEY: verifier la variable d'environnement dans .env.
-- Erreur de connexion Qdrant: verifier que Qdrant tourne sur localhost:6333.
-- Aucun resultat RAG: lancer d'abord index ou full, puis regenerer le graphe si necessaire.
-
-## Roadmap suggeree
-
-- Etendre la couverture de tests (generation, rag, api).
-- Ajouter un serveur API pret a lancer dans le repo (point d'entree uvicorn).
-- Ajouter un mode local/mock sans appel LLM pour CI.

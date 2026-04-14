@@ -1,19 +1,16 @@
 import { useState, useEffect } from "react";
-import { NavLink, useLocation } from "react-router-dom";
-import { MessageSquare, BookOpen, Share2, FileCode2, Workflow } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { MessageSquare, BookOpen, Share2, Workflow } from "lucide-react";
 import { api } from "@/lib/api";
 import talanLogo from "@/assets/talan-logo.svg";
 
 const navItems = [
-  { to: "/", label: "Chat", icon: MessageSquare },
-  { to: "/pipeline", label: "Pipeline", icon: Workflow },
+  { to: "/", label: "Assistant", icon: MessageSquare },
   { to: "/docs", label: "Documentation", icon: BookOpen },
-  { to: "/graph", label: "Knowledge Graph", icon: Share2 },
-  { to: "/diagrams", label: "Diagrammes Mermaid", icon: FileCode2 },
+  { to: "/graph", label: "Graphe de connaissances", icon: Share2 },
 ];
 
 export default function AppSidebar() {
-  const location = useLocation();
   const [healthy, setHealthy] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -50,7 +47,23 @@ export default function AppSidebar() {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-hover">
+      <nav className="py-4 px-3 space-y-1">
+        <NavLink
+          to="/pipeline"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+              isActive
+                ? "bg-sidebar-active text-primary-foreground"
+                : "text-sidebar-fg hover:bg-sidebar-hover"
+            }`
+          }
+        >
+          <Workflow className="w-4 h-4" />
+          Configuration pipeline
+        </NavLink>
+      </nav>
+
+      <div className="p-4 border-t border-sidebar-hover space-y-3">
         <div className="flex items-center gap-2 text-xs text-sidebar-muted">
           <span
             className={`w-2 h-2 rounded-full ${
@@ -61,7 +74,7 @@ export default function AppSidebar() {
                 : "bg-accent"
             }`}
           />
-          {healthy === null ? "Checking..." : healthy ? "Backend online" : "Backend offline"}
+          {healthy === null ? "Vérification..." : healthy ? "Backend en ligne" : "Backend hors ligne"}
         </div>
       </div>
     </aside>

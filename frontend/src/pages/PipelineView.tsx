@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Play, RefreshCw, Database, ExternalLink, RotateCcw } from "lucide-react";
+import { Loader2, Play, Square, Database, ExternalLink, RotateCcw } from "lucide-react";
 import { api, type PipelineRunRequest, type PipelineStatus, type QdrantInfo } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
@@ -78,6 +78,16 @@ export default function PipelineView() {
     }
   };
 
+  const cancelPipeline = async () => {
+    try {
+      const next = await api.cancelPipeline();
+      setStatus(next);
+      setError(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Impossible d'annuler le pipeline");
+    }
+  };
+
   const resetStatus = async () => {
     try {
       const next = await api.resetPipelineStatus();
@@ -97,7 +107,10 @@ export default function PipelineView() {
     }
   };
 
-  const isRunning = status?.status === "running" || status?.status === "queued";
+  const isRunning =
+    status?.status === "running" ||
+    status?.status === "queued" ||
+    status?.status === "cancelling";
 
   const recentEvents = useMemo(() => {
     const events = status?.events ?? [];
@@ -113,25 +126,22 @@ export default function PipelineView() {
           <div>
             <h2 className="text-xl font-semibold">Pipeline d'indexation</h2>
             <p className="text-sm text-muted-foreground">
-              Lance le meme workflow que le CLI: parsing, embeddings, docs, graph, diagrammes.
+              Lance le meme workflow que le CLI: parsing, embeddings, documentation et graphe.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => void fetchStatus()}>
-              <RefreshCw className="w-4 h-4 mr-1" /> Rafraichir
-            </Button>
             <Button variant="outline" onClick={resetStatus} disabled={isRunning}>
-              <RotateCcw className="w-4 h-4 mr-1" /> Reset statut
+              <RotateCcw className="w-4 h-4 mr-1" /> Reinitialiser le statut
             </Button>
           </div>
         </div>
 
         <section className="rounded-lg border bg-card p-4 space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Arguments</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Parametres</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="space-y-1 md:col-span-2">
-              <span className="text-sm">Repository path ou URL Git</span>
+              <span className="text-sm">Chemin du depot ou URL Git</span>
               <input
                 value={form.repo}
                 onChange={(e) => setForm((prev) => ({ ...prev, repo: e.target.value }))}
@@ -141,7 +151,7 @@ export default function PipelineView() {
             </label>
 
             <label className="space-y-1">
-              <span className="text-sm">Output docs</span>
+              <span className="text-sm">Sortie documentation</span>
               <input
                 value={form.output_docs}
                 onChange={(e) => setForm((prev) => ({ ...prev, output_docs: e.target.value }))}
@@ -150,7 +160,7 @@ export default function PipelineView() {
             </label>
 
             <label className="space-y-1">
-              <span className="text-sm">Output graph</span>
+              <span className="text-sm">Sortie graphe</span>
               <input
                 value={form.output_graph}
                 onChange={(e) => setForm((prev) => ({ ...prev, output_graph: e.target.value }))}
@@ -159,7 +169,7 @@ export default function PipelineView() {
             </label>
 
             <label className="space-y-1">
-              <span className="text-sm">SQL dialect</span>
+              <span className="text-sm">Dialecte SQL</span>
               <input
                 value={form.dialect}
                 onChange={(e) => setForm((prev) => ({ ...prev, dialect: e.target.value }))}
@@ -174,7 +184,7 @@ export default function PipelineView() {
                   checked={form.recreate}
                   onChange={(e) => setForm((prev) => ({ ...prev, recreate: e.target.checked }))}
                 />
-                Recreate collection
+                Recreer la collection
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -182,7 +192,7 @@ export default function PipelineView() {
                   checked={form.dry_run}
                   onChange={(e) => setForm((prev) => ({ ...prev, dry_run: e.target.checked }))}
                 />
-                Dry-run index (sans embeddings)
+                Indexation a blanc (sans embeddings)
               </label>
             </div>
           </div>
@@ -198,6 +208,9 @@ export default function PipelineView() {
                   <Play className="w-4 h-4 mr-1" /> Lancer le pipeline
                 </>
               )}
+            </Button>
+            <Button variant="destructive" onClick={cancelPipeline} disabled={!isRunning || status?.status === "cancelling"}>
+              <Square className="w-4 h-4 mr-1" /> Annuler le pipeline
             </Button>
           </div>
         </section>
@@ -244,7 +257,7 @@ export default function PipelineView() {
                   Statut: <strong>{status.status}</strong>
                 </p>
                 <p>
-                  Stage: <strong>{status.current_stage}</strong>
+                  Etape: <strong>{status.current_stage}</strong>
                 </p>
                 <p>Fichiers detectes: {status.stats.files}</p>
                 <p>Fichiers parses: {status.stats.parsed_files}</p>
@@ -270,21 +283,30 @@ export default function PipelineView() {
 
               {status.status === "succeeded" && (
                 <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-2">
-                  <p>Pipeline termine. Vous pouvez maintenant utiliser les vues ci-dessous:</p>
+                  <p>Pipeline termine. Vous pouvez maintenant utiliser les vues ci-dessous :</p>
                   <div className="flex flex-wrap gap-2">
                     <Link to="/">
-                      <Button size="sm">Chat</Button>
+                      <Button size="sm">Assistant</Button>
                     </Link>
                     <Link to="/docs">
                       <Button size="sm" variant="outline">Documentation</Button>
                     </Link>
                     <Link to="/graph">
-                      <Button size="sm" variant="outline">Knowledge Graph</Button>
-                    </Link>
-                    <Link to="/diagrams">
-                      <Button size="sm" variant="outline">Diagrammes</Button>
+                      <Button size="sm" variant="outline">Graphe de connaissances</Button>
                     </Link>
                   </div>
+                </div>
+              )}
+
+              {status.status === "cancelled" && (
+                <div className="rounded-md border border-amber-300/60 bg-amber-100/40 p-3 text-sm text-amber-900">
+                  Pipeline annule par l'utilisateur.
+                </div>
+              )}
+
+              {status.status === "cancelling" && (
+                <div className="rounded-md border border-red-300/60 bg-red-100/40 p-3 text-sm text-red-900">
+                  Annulation en cours...
                 </div>
               )}
             </>

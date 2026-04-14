@@ -1,5 +1,4 @@
 import argparse
-import os
 from src.codeNavigator.embedding.indexer import run_indexing
 from src.codeNavigator.generation.assembler import build_project_doc
 from src.codeNavigator.generation.doc_generator import DocGenerator
@@ -8,13 +7,9 @@ from src.codeNavigator.generation.exporter import export_to_markdown
 from src.codeNavigator.ingestion.repo_walker import walk_repo
 from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
 from src.codeNavigator.graph.builder import GraphBuilder
-from src.codeNavigator.graph.mermaid_exporter import export_all_diagrams
 from src.codeNavigator.graph.json_exporter import export_graph_json
 
 from src.codeNavigator.rag.cli import run_chat_cli
-
-
-DOCS_DETAIL_LEVEL = os.getenv("DOCS_DETAIL_LEVEL", "compact")
 
 
 def main():
@@ -65,7 +60,7 @@ def main():
         project_doc = build_project_doc(
             chunks,
             generator,
-            detail_level=DOCS_DETAIL_LEVEL,
+            detail_level="full",
         )
         export_to_markdown(project_doc, args.output)
 
@@ -79,7 +74,6 @@ def main():
         nodes = builder.get_nodes()
         edges = builder.get_edges()
 
-        export_all_diagrams(nodes, edges, output_dir=args.output)
         export_graph_json(nodes, edges, output_path=f"{args.output}/graph.json")
 
     elif args.command == "full":
@@ -90,7 +84,7 @@ def main():
         project_doc = build_project_doc(
             chunks,
             generator,
-            detail_level=DOCS_DETAIL_LEVEL,
+            detail_level="full",
         )
         export_to_markdown(project_doc, args.output)
 
