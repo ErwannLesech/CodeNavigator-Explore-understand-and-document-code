@@ -8,7 +8,6 @@ import ChatView from "@/pages/ChatView";
 import PipelineView from "@/pages/PipelineView";
 import DocsView from "@/pages/DocsView";
 import GraphView from "@/pages/GraphView";
-import DiagramsView from "@/pages/DiagramsView";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,7 +24,6 @@ const App = () => (
             <Route path="/pipeline" element={<PipelineView />} />
             <Route path="/docs" element={<DocsView />} />
             <Route path="/graph" element={<GraphView />} />
-            <Route path="/diagrams" element={<DiagramsView />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

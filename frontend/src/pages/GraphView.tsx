@@ -361,7 +361,7 @@ export default function GraphView() {
   if (!data || data.nodes.length === 0)
     return (
       <div className="flex items-center justify-center h-screen text-muted-foreground text-sm">
-        No graph data available
+        Aucune donnee de graphe disponible
       </div>
     );
 

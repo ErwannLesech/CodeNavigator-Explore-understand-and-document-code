@@ -64,10 +64,10 @@ function DebugPanel({ debug }: { debug: ChatDebugInfo }) {
       >
         <span className="flex items-center gap-1">
           {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-          Debug RAG
+          Details RAG
         </span>
         <span>
-          {debug.duration_ms ? `${debug.duration_ms} ms` : "-"} · tokens: {debug.tokens?.total ?? "-"}
+          {debug.duration_ms ? `${debug.duration_ms} ms` : "-"} · jetons: {debug.tokens?.total ?? "-"}
         </span>
       </button>
 
@@ -80,12 +80,12 @@ function DebugPanel({ debug }: { debug: ChatDebugInfo }) {
           )}
 
           <p>
-            model: <span className="font-mono">{debug.model ?? "unknown"}</span> | prompt: {debug.tokens?.prompt ?? "-"} |
-            completion: {debug.tokens?.completion ?? "-"} | total: {debug.tokens?.total ?? "-"}
+            modele: <span className="font-mono">{debug.model ?? "inconnu"}</span> | invite: {debug.tokens?.prompt ?? "-"} |
+            reponse: {debug.tokens?.completion ?? "-"} | total: {debug.tokens?.total ?? "-"}
           </p>
 
           {debug.vector_error && (
-            <p className="font-mono text-[11px] text-muted-foreground/90">vector_error: {debug.vector_error}</p>
+            <p className="font-mono text-[11px] text-muted-foreground/90">erreur_vectorielle: {debug.vector_error}</p>
           )}
 
           {retrieval.length > 0 && (
@@ -164,7 +164,7 @@ export default function ChatView() {
         },
       ]);
     } catch (e: any) {
-      setError(e.message || "Failed to get response");
+      setError(e.message || "Echec de la recuperation de la reponse");
     } finally {
       setLoading(false);
     }
@@ -176,7 +176,7 @@ export default function ChatView() {
     try {
       await api.resetChat();
     } catch {
-      setError("Failed to reset backend chat state");
+      setError("Impossible de reinitialiser l'etat du chat backend");
     }
   };
 
@@ -184,9 +184,9 @@ export default function ChatView() {
     <div className="flex flex-col h-screen">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b bg-card">
-        <h2 className="text-lg font-semibold">Chat</h2>
+        <h2 className="text-lg font-semibold">Assistant</h2>
         <Button variant="ghost" size="sm" onClick={reset} className="text-muted-foreground">
-          <RotateCcw className="w-4 h-4 mr-1" /> Reset
+          <RotateCcw className="w-4 h-4 mr-1" /> Reinitialiser
         </Button>
       </div>
 
@@ -195,7 +195,7 @@ export default function ChatView() {
         {messages.length === 0 && !loading && (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <MessageSquareIcon className="w-12 h-12 mb-3 opacity-30" />
-            <p className="text-sm">Ask anything about the codebase</p>
+            <p className="text-sm">Posez vos questions sur la codebase</p>
           </div>
         )}
 
@@ -214,7 +214,7 @@ export default function ChatView() {
               <p className="whitespace-pre-wrap">{msg.content}</p>
               {msg.role === "assistant" && msg.debug?.vector_status === "unavailable" && (
                 <p className="mt-2 inline-flex rounded-md border border-amber-300/70 bg-amber-100/50 px-2 py-0.5 text-[11px] text-amber-900">
-                  Vector DB indisponible - mode graphe
+                  Base vectorielle indisponible - mode graphe
                 </p>
               )}
               {msg.sources && msg.sources.length > 0 && (
@@ -254,7 +254,7 @@ export default function ChatView() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about the codebase..."
+            placeholder="Posez une question sur la codebase..."
             className="flex-1 rounded-md border border-input bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             disabled={loading}
           />

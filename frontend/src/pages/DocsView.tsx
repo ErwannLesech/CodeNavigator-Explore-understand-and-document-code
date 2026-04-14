@@ -19,6 +19,10 @@ type RepoTreeNode = {
   children: RepoTreeNode[];
 };
 
+function formatDocKind(kind: "global" | "module"): string {
+  return kind === "global" ? "document global" : "module";
+}
+
 function normalizeMarkdownContent(rawContent: string): string {
   let content = rawContent.trim();
 
@@ -186,7 +190,7 @@ export default function DocsView() {
       const r = await api.getDoc(name);
       setContent(normalizeMarkdownContent(r.content));
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Failed to load document";
+      const message = e instanceof Error ? e.message : "Impossible de charger le document";
       setError(message);
       setContent("");
       setRelated([]);
@@ -276,13 +280,13 @@ export default function DocsView() {
     <div className="flex h-screen">
       <div className="w-80 flex-shrink-0 border-r bg-card overflow-y-auto">
         <div className="px-4 py-3 border-b space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Modules</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Documents</h2>
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search docs..."
+              placeholder="Rechercher dans la documentation..."
               className="w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
@@ -297,7 +301,7 @@ export default function DocsView() {
           <div className="py-1">
             {globalDocs.length > 0 && search.trim().length < 2 && (
               <>
-                <div className="px-4 pt-2 pb-1 text-xs text-muted-foreground uppercase tracking-wide">Global docs</div>
+                <div className="px-4 pt-2 pb-1 text-xs text-muted-foreground uppercase tracking-wide">Documents globaux</div>
                 <ul>
                   {globalDocs.map((doc) => (
                     <li key={doc.name}>
@@ -320,11 +324,11 @@ export default function DocsView() {
             )}
 
             <div className="px-4 pt-2 pb-1 text-xs text-muted-foreground uppercase tracking-wide">
-              {search.trim().length >= 2 ? "Search results" : "Repository tree"}
+              {search.trim().length >= 2 ? "Resultats de recherche" : "Arborescence du depot"}
             </div>
             {search.trim().length >= 2 ? (
               searching ? (
-                <div className="px-4 py-3 text-xs text-muted-foreground">Searching...</div>
+                <div className="px-4 py-3 text-xs text-muted-foreground">Recherche en cours...</div>
               ) : (
                 <ul>
                   {sideList.map((item) => (
@@ -340,13 +344,13 @@ export default function DocsView() {
                         <FileText className="w-4 h-4 flex-shrink-0" />
                         <div className="min-w-0">
                           <div className="truncate">{item.sourcePath ?? item.name}</div>
-                          <div className="text-xs text-muted-foreground capitalize">{item.kind}</div>
+                          <div className="text-xs text-muted-foreground capitalize">{formatDocKind(item.kind)}</div>
                         </div>
                       </button>
                     </li>
                   ))}
                   {sideList.length === 0 && (
-                    <li className="px-4 py-3 text-xs text-muted-foreground">No result</li>
+                    <li className="px-4 py-3 text-xs text-muted-foreground">Aucun resultat</li>
                   )}
                 </ul>
               )
@@ -361,7 +365,7 @@ export default function DocsView() {
         {selected && related.length > 0 && (
           <div className="rounded-md border bg-muted/40 px-4 py-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-              Related modules
+              Modules lies
             </div>
             <div className="flex flex-wrap gap-2">
               {related.map((item) => (
@@ -416,7 +420,7 @@ export default function DocsView() {
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <FileText className="w-12 h-12 mb-3 opacity-30" />
-            <p className="text-sm">Select a module to view its documentation</p>
+            <p className="text-sm">Selectionnez un module pour afficher sa documentation</p>
           </div>
         )}
       </div>

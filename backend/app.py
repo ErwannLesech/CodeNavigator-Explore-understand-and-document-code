@@ -25,7 +25,6 @@ from src.codeNavigator.generation.doc_generator import DocGenerator
 from src.codeNavigator.generation.exporter import export_to_markdown
 from src.codeNavigator.graph.builder import GraphBuilder
 from src.codeNavigator.graph.json_exporter import export_graph_json
-from src.codeNavigator.graph.mermaid_exporter import export_all_diagrams
 from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
 from src.codeNavigator.ingestion.repo_walker import walk_repo
 
@@ -35,7 +34,6 @@ from backend.chat import router as chat_router
 DOCS_OUTPUT_DIR = Path(os.getenv("DOCS_OUTPUT_DIR", "data/output/docs"))
 MODULES_DIR = DOCS_OUTPUT_DIR / "modules"
 GRAPH_JSON_PATH = Path(os.getenv("GRAPH_JSON_PATH", "data/output/graph/graph.json"))
-DIAGRAMS_DIR = Path(os.getenv("DIAGRAMS_DIR", "data/output/graph"))
 README_PATH = DOCS_OUTPUT_DIR / "README.md"
 INDEX_PATH = DOCS_OUTPUT_DIR / "INDEX.md"
 DOCS_DETAIL_LEVEL = os.getenv("DOCS_DETAIL_LEVEL", "compact")
@@ -82,20 +80,6 @@ class RelatedDocsResponse(BaseModel):
 class GraphResponse(BaseModel):
     nodes: list[dict[str, Any]]
     edges: list[dict[str, Any]]
-
-
-class DiagramItem(BaseModel):
-    name: str
-    path: str
-
-
-class DiagramsResponse(BaseModel):
-    diagrams: list[DiagramItem]
-
-
-class DiagramContentResponse(BaseModel):
-    name: str
-    content: str
 
 
 class PipelineRunRequest(BaseModel):
@@ -423,7 +407,6 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
         nodes = builder.get_nodes()
         edges = builder.get_edges()
 
-        export_all_diagrams(nodes, edges, output_dir=request.output_graph)
         graph_json_path = str(Path(request.output_graph) / "graph.json")
         export_graph_json(nodes, edges, output_path=graph_json_path)
 
@@ -665,38 +648,6 @@ def _read_graph() -> GraphResponse:
     return GraphResponse(nodes=nodes, edges=edges)
 
 
-def _list_diagrams() -> list[DiagramItem]:
-    if not DIAGRAMS_DIR.exists() or not DIAGRAMS_DIR.is_dir():
-        return []
-
-    diagrams: list[DiagramItem] = []
-    for path in sorted(DIAGRAMS_DIR.glob("*.mermaid"), key=lambda p: p.name.lower()):
-        diagrams.append(
-            DiagramItem(name=path.name, path=str(path.relative_to(DIAGRAMS_DIR.parent)))
-        )
-    return diagrams
-
-
-def _safe_diagram_path(diagram_name: str) -> Path:
-    normalized_name = Path(diagram_name).name
-    if normalized_name != diagram_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid diagram name.",
-        )
-
-    if not normalized_name.endswith(".mermaid"):
-        normalized_name = f"{normalized_name}.mermaid"
-
-    path = DIAGRAMS_DIR / normalized_name
-    if not path.exists() or not path.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Diagram not found.",
-        )
-    return path
-
-
 def _related_docs(module_name: str) -> list[DocModule]:
     graph = _read_graph()
     mapping = _extract_doc_links_from_index()
@@ -806,22 +757,6 @@ def create_app() -> FastAPI:
     @app.get("/api/graph", response_model=GraphResponse, status_code=status.HTTP_200_OK)
     async def get_graph() -> GraphResponse:
         return _read_graph()
-
-    @app.get(
-        "/api/diagrams", response_model=DiagramsResponse, status_code=status.HTTP_200_OK
-    )
-    async def get_diagrams() -> DiagramsResponse:
-        return DiagramsResponse(diagrams=_list_diagrams())
-
-    @app.get(
-        "/api/diagrams/{diagram_name}",
-        response_model=DiagramContentResponse,
-        status_code=status.HTTP_200_OK,
-    )
-    async def get_diagram(diagram_name: str) -> DiagramContentResponse:
-        path = _safe_diagram_path(diagram_name)
-        content = path.read_text(encoding="utf-8")
-        return DiagramContentResponse(name=path.name, content=content)
 
     @app.post(
         "/api/pipeline/start",
