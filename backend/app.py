@@ -4,7 +4,6 @@ import json
 import os
 import re
 import threading
-import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -321,7 +320,9 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
 
                 if processed < total_chunks:
                     if PIPELINE_CANCEL_EVENT.wait(0.5):
-                        raise PipelineCancelledError("Pipeline cancelled by user request.")
+                        raise PipelineCancelledError(
+                            "Pipeline cancelled by user request."
+                        )
 
             _raise_if_pipeline_cancelled()
             store.upsert_chunks(all_chunks, embeddings)
@@ -331,9 +332,7 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
                 progress=64,
             )
 
-        estimated_llm_calls, modules_count = estimate_doc_workload(
-            all_chunks, "full"
-        )
+        estimated_llm_calls, modules_count = estimate_doc_workload(all_chunks, "full")
 
         _append_pipeline_event(
             stage="docs",
