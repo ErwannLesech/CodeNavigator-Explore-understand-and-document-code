@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, RotateCcw, ChevronDown, ChevronRight } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   api,
   type ChatMessage,
@@ -12,6 +14,13 @@ import { Button } from "@/components/ui/button";
 interface DisplayMessage extends ChatMessage {
   sources?: ChatSource[];
   debug?: ChatDebugInfo;
+}
+
+function formatDurationSeconds(durationMs?: number): string {
+  if (typeof durationMs !== "number") {
+    return "-";
+  }
+  return `${(durationMs / 1000).toFixed(2)} s`;
 }
 
 function SourcesCollapsible({ sources }: { sources: ChatSource[] }) {
@@ -67,7 +76,7 @@ function DebugPanel({ debug }: { debug: ChatDebugInfo }) {
           Details RAG
         </span>
         <span>
-          {debug.duration_ms ? `${debug.duration_ms} ms` : "-"} · jetons: {debug.tokens?.total ?? "-"}
+          {formatDurationSeconds(debug.duration_ms)} · tokens: {debug.tokens?.total ?? "-"}
         </span>
       </button>
 
@@ -80,8 +89,8 @@ function DebugPanel({ debug }: { debug: ChatDebugInfo }) {
           )}
 
           <p>
-            modele: <span className="font-mono">{debug.model ?? "inconnu"}</span> | invite: {debug.tokens?.prompt ?? "-"} |
-            reponse: {debug.tokens?.completion ?? "-"} | total: {debug.tokens?.total ?? "-"}
+            modele: <span className="font-mono">{debug.model ?? "inconnu"}</span> | prompt tokens: {debug.tokens?.prompt ?? "-"} |
+            completion tokens: {debug.tokens?.completion ?? "-"} | total tokens: {debug.tokens?.total ?? "-"}
           </p>
 
           {debug.vector_error && (
@@ -211,7 +220,13 @@ export default function ChatView() {
                   : "bg-muted text-foreground"
               }`}
             >
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              {msg.role === "assistant" ? (
+                <div className="prose prose-sm max-w-none prose-pre:max-h-96 prose-pre:overflow-auto dark:prose-invert">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              )}
               {msg.role === "assistant" && msg.debug?.vector_status === "unavailable" && (
                 <p className="mt-2 inline-flex rounded-md border border-amber-300/70 bg-amber-100/50 px-2 py-0.5 text-[11px] text-amber-900">
                   Base vectorielle indisponible - mode graphe

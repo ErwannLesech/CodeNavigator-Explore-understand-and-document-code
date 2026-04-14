@@ -36,7 +36,6 @@ MODULES_DIR = DOCS_OUTPUT_DIR / "modules"
 GRAPH_JSON_PATH = Path(os.getenv("GRAPH_JSON_PATH", "data/output/graph/graph.json"))
 README_PATH = DOCS_OUTPUT_DIR / "README.md"
 INDEX_PATH = DOCS_OUTPUT_DIR / "INDEX.md"
-DOCS_DETAIL_LEVEL = os.getenv("DOCS_DETAIL_LEVEL", "compact")
 
 
 class HealthResponse(BaseModel):
@@ -136,6 +135,7 @@ MAX_PIPELINE_EVENTS = 600
 
 # Shared mutable runtime for pipeline jobs. Guard every read/write with this lock.
 PIPELINE_LOCK = threading.RLock()
+PIPELINE_CANCEL_EVENT = threading.Event()
 PIPELINE_STATE: dict[str, Any] = {
     "job_id": None,
     "status": "idle",
@@ -149,6 +149,10 @@ PIPELINE_STATE: dict[str, Any] = {
     "outputs": {"docs": "", "graph": "", "graph_json": ""},
     "events": [],
 }
+
+
+class PipelineCancelledError(RuntimeError):
+    pass
 
 
 def _utc_now() -> str:
@@ -176,6 +180,11 @@ def _append_pipeline_event(
             PIPELINE_STATE["events"] = PIPELINE_STATE["events"][-MAX_PIPELINE_EVENTS:]
 
 
+def _raise_if_pipeline_cancelled() -> None:
+    if PIPELINE_CANCEL_EVENT.is_set():
+        raise PipelineCancelledError("Pipeline cancelled by user request.")
+
+
 def _pipeline_snapshot() -> PipelineStatusResponse:
     with PIPELINE_LOCK:
         return PipelineStatusResponse(
@@ -197,6 +206,13 @@ def _pipeline_snapshot() -> PipelineStatusResponse:
 
 def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
     with PIPELINE_LOCK:
+        if PIPELINE_CANCEL_EVENT.is_set():
+            PIPELINE_STATE["status"] = "cancelled"
+            PIPELINE_STATE["started_at"] = _utc_now()
+            PIPELINE_STATE["finished_at"] = _utc_now()
+            PIPELINE_STATE["current_stage"] = "cancelled"
+            PIPELINE_STATE["error"] = None
+            return
         PIPELINE_STATE["status"] = "running"
         PIPELINE_STATE["started_at"] = _utc_now()
         PIPELINE_STATE["finished_at"] = None
@@ -220,6 +236,7 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
             progress=1,
             details={"repo": request.repo},
         )
+        _raise_if_pipeline_cancelled()
 
         files = list(walk_repo(request.repo))
         if not files:
@@ -240,6 +257,7 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
         parse_tick = max(1, file_count // 20)
 
         for index, source_file in enumerate(files, start=1):
+            _raise_if_pipeline_cancelled()
             parsed = dispatch_parser(source_file, sql_dialect=request.dialect)
             parsed_files.append(parsed)
             file_chunks = chunk_parsed_file(parsed)
@@ -258,6 +276,7 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
                 )
 
         store = VectorStore()
+        _raise_if_pipeline_cancelled()
         _append_pipeline_event(
             stage="embedding",
             message="Preparing Qdrant collection",
@@ -281,6 +300,7 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
 
             batch_size = 100
             for start_idx in range(0, total_chunks, batch_size):
+                _raise_if_pipeline_cancelled()
                 batch = all_chunks[start_idx : start_idx + batch_size]
                 response = embedder.client.embeddings.create(
                     model="mistral-embed", inputs=[chunk.content for chunk in batch]
@@ -300,8 +320,10 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
                 )
 
                 if processed < total_chunks:
-                    time.sleep(0.5)
+                    if PIPELINE_CANCEL_EVENT.wait(0.5):
+                        raise PipelineCancelledError("Pipeline cancelled by user request.")
 
+            _raise_if_pipeline_cancelled()
             store.upsert_chunks(all_chunks, embeddings)
             _append_pipeline_event(
                 stage="embedding",
@@ -310,7 +332,7 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
             )
 
         estimated_llm_calls, modules_count = estimate_doc_workload(
-            all_chunks, DOCS_DETAIL_LEVEL
+            all_chunks, "full"
         )
 
         _append_pipeline_event(
@@ -344,7 +366,7 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
                 project_doc = build_project_doc(
                     all_chunks,
                     generator,
-                    detail_level=DOCS_DETAIL_LEVEL,
+                    detail_level="full",
                     progress_callback=_on_doc_progress,
                 )
                 export_to_markdown(project_doc, request.output_docs)
@@ -358,7 +380,8 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
         docs_elapsed = 0
         docs_heartbeat_seconds = 6
         while docs_thread.is_alive():
-            time.sleep(docs_heartbeat_seconds)
+            if PIPELINE_CANCEL_EVENT.wait(docs_heartbeat_seconds):
+                raise PipelineCancelledError("Pipeline cancelled by user request.")
             docs_elapsed += docs_heartbeat_seconds
             completed = int(docs_result.get("completed") or 0)
             total = int(docs_result.get("total") or estimated_llm_calls)
@@ -377,13 +400,13 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
                 details={
                     "estimated_llm_calls": estimated_llm_calls,
                     "output": request.output_docs,
-                    "detail_level": DOCS_DETAIL_LEVEL,
                     "docs_done": completed,
                     "docs_total": total,
                     "docs_last_label": label,
                 },
             )
 
+        _raise_if_pipeline_cancelled()
         docs_thread.join()
         if docs_result["error"] is not None:
             raise RuntimeError(str(docs_result["error"]))
@@ -401,6 +424,7 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
             progress=88,
             details={"output": request.output_graph},
         )
+        _raise_if_pipeline_cancelled()
 
         builder = GraphBuilder()
         builder.ingest(parsed_files)
@@ -409,6 +433,7 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
 
         graph_json_path = str(Path(request.output_graph) / "graph.json")
         export_graph_json(nodes, edges, output_path=graph_json_path)
+        _raise_if_pipeline_cancelled()
 
         os.environ["GRAPH_JSON_PATH"] = graph_json_path
         import backend.chat as chat_backend
@@ -430,6 +455,16 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
                 "graph": request.output_graph,
                 "graph_json": graph_json_path,
             }
+    except PipelineCancelledError as exc:
+        _append_pipeline_event(
+            stage="cancelled",
+            message=str(exc),
+            progress=float(PIPELINE_STATE.get("progress", 0.0)),
+        )
+        with PIPELINE_LOCK:
+            PIPELINE_STATE["status"] = "cancelled"
+            PIPELINE_STATE["finished_at"] = _utc_now()
+            PIPELINE_STATE["error"] = None
     except Exception as exc:
         _append_pipeline_event(
             stage="failed",
@@ -440,6 +475,8 @@ def _run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
             PIPELINE_STATE["status"] = "failed"
             PIPELINE_STATE["finished_at"] = _utc_now()
             PIPELINE_STATE["error"] = str(exc)
+    finally:
+        PIPELINE_CANCEL_EVENT.clear()
 
 
 def _qdrant_url() -> str:
@@ -765,7 +802,7 @@ def create_app() -> FastAPI:
     )
     async def start_pipeline(request: PipelineRunRequest) -> PipelineStartResponse:
         with PIPELINE_LOCK:
-            if PIPELINE_STATE["status"] == "running":
+            if PIPELINE_STATE["status"] in {"running", "queued", "cancelling"}:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="A pipeline run is already in progress.",
@@ -773,6 +810,7 @@ def create_app() -> FastAPI:
             job_id = str(uuid.uuid4())
             PIPELINE_STATE["job_id"] = job_id
             PIPELINE_STATE["status"] = "queued"
+            PIPELINE_CANCEL_EVENT.clear()
 
         worker = threading.Thread(
             target=_run_pipeline_job,
@@ -798,11 +836,12 @@ def create_app() -> FastAPI:
     )
     async def reset_pipeline_status() -> PipelineStatusResponse:
         with PIPELINE_LOCK:
-            if PIPELINE_STATE["status"] == "running":
+            if PIPELINE_STATE["status"] in {"running", "queued", "cancelling"}:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Cannot reset while pipeline is running.",
                 )
+            PIPELINE_CANCEL_EVENT.clear()
             PIPELINE_STATE.update(
                 {
                     "job_id": None,
@@ -823,6 +862,28 @@ def create_app() -> FastAPI:
                     "events": [],
                 }
             )
+        return _pipeline_snapshot()
+
+    @app.post(
+        "/api/pipeline/cancel",
+        response_model=PipelineStatusResponse,
+        status_code=status.HTTP_200_OK,
+    )
+    async def cancel_pipeline() -> PipelineStatusResponse:
+        with PIPELINE_LOCK:
+            if PIPELINE_STATE["status"] not in {"running", "queued", "cancelling"}:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="No running pipeline to cancel.",
+                )
+            PIPELINE_CANCEL_EVENT.set()
+            PIPELINE_STATE["status"] = "cancelling"
+
+        _append_pipeline_event(
+            stage="cancelling",
+            message="Cancellation requested",
+            progress=float(PIPELINE_STATE.get("progress", 0.0)),
+        )
         return _pipeline_snapshot()
 
     @app.get(

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Play, RefreshCw, Database, ExternalLink, RotateCcw } from "lucide-react";
+import { Loader2, Play, Square, Database, ExternalLink, RotateCcw } from "lucide-react";
 import { api, type PipelineRunRequest, type PipelineStatus, type QdrantInfo } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
@@ -78,6 +78,16 @@ export default function PipelineView() {
     }
   };
 
+  const cancelPipeline = async () => {
+    try {
+      const next = await api.cancelPipeline();
+      setStatus(next);
+      setError(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Impossible d'annuler le pipeline");
+    }
+  };
+
   const resetStatus = async () => {
     try {
       const next = await api.resetPipelineStatus();
@@ -97,7 +107,10 @@ export default function PipelineView() {
     }
   };
 
-  const isRunning = status?.status === "running" || status?.status === "queued";
+  const isRunning =
+    status?.status === "running" ||
+    status?.status === "queued" ||
+    status?.status === "cancelling";
 
   const recentEvents = useMemo(() => {
     const events = status?.events ?? [];
@@ -117,9 +130,6 @@ export default function PipelineView() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => void fetchStatus()}>
-              <RefreshCw className="w-4 h-4 mr-1" /> Rafraichir
-            </Button>
             <Button variant="outline" onClick={resetStatus} disabled={isRunning}>
               <RotateCcw className="w-4 h-4 mr-1" /> Reinitialiser le statut
             </Button>
@@ -198,6 +208,9 @@ export default function PipelineView() {
                   <Play className="w-4 h-4 mr-1" /> Lancer le pipeline
                 </>
               )}
+            </Button>
+            <Button variant="destructive" onClick={cancelPipeline} disabled={!isRunning || status?.status === "cancelling"}>
+              <Square className="w-4 h-4 mr-1" /> Annuler le pipeline
             </Button>
           </div>
         </section>
@@ -282,6 +295,18 @@ export default function PipelineView() {
                       <Button size="sm" variant="outline">Graphe de connaissances</Button>
                     </Link>
                   </div>
+                </div>
+              )}
+
+              {status.status === "cancelled" && (
+                <div className="rounded-md border border-amber-300/60 bg-amber-100/40 p-3 text-sm text-amber-900">
+                  Pipeline annule par l'utilisateur.
+                </div>
+              )}
+
+              {status.status === "cancelling" && (
+                <div className="rounded-md border border-red-300/60 bg-red-100/40 p-3 text-sm text-red-900">
+                  Annulation en cours...
                 </div>
               )}
             </>
