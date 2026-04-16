@@ -35,7 +35,7 @@ def test_prompt_for_class_includes_bases_and_method_docs() -> None:
         metadata={"name": "User", "bases": ["BaseUser"]},
     )
 
-    prompt = prompt_for_class(chunk, method_docs=["### method\nDoc method"]) 
+    prompt = prompt_for_class(chunk, method_docs=["### method\nDoc method"])
 
     assert "Class `User`" in prompt
     assert "BaseUser" in prompt
