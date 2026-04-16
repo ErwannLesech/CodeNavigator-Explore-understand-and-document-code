@@ -33,7 +33,7 @@ class VectorStore:
             if recreate:
                 self.client.delete_collection(COLLECTION_NAME)
             else:
-                return  # d�j� existante, on ne touche pas
+                return  # déjé existante, on ne touche pas
 
         self.client.create_collection(
             collection_name=COLLECTION_NAME,
@@ -41,7 +41,7 @@ class VectorStore:
         )
 
     def upsert_chunks(self, chunks: list[Chunk], embeddings: list[list[float]]):
-        """Ins�re ou met � jour des chunks avec leurs embeddings."""
+        """Insére ou met é jour des chunks avec leurs embeddings."""
         assert len(chunks) == len(embeddings)
 
         points = [
@@ -71,7 +71,7 @@ class VectorStore:
         filter_type: Optional[str] = None,
         filter_file: Optional[str] = None,
     ) -> list[dict]:
-        """Recherche s�mantique avec filtres optionnels sur les m�tadonn�es."""
+        """Recherche sémantique avec filtres optionnels sur les métadonnées."""
         must_conditions = []
 
         if filter_language:

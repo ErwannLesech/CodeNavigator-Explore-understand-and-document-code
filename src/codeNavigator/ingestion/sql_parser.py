@@ -121,7 +121,7 @@ def _parse_create_table(stmt) -> Optional[TableSchema]:
             }
         )
 
-    # Cl�s �trang�res d�clar�es en contrainte de table
+    # Clés étrangéres déclarées en contrainte de table
     for fk in stmt.find_all(exp.ForeignKey):
         fk_cols = [c.name for c in fk.find_all(exp.Column)]
         ref = fk.find(exp.Reference)
@@ -146,7 +146,7 @@ def _parse_create_table(stmt) -> Optional[TableSchema]:
 
 
 def _parse_query(stmt) -> QueryInfo:
-    """Extrait le lineage d'une requ�te DML (SELECT, INSERT, UPDATE, DELETE)."""
+    """Extrait le lineage d'une requéte DML (SELECT, INSERT, UPDATE, DELETE)."""
     query_type = type(stmt).__name__.upper()
 
     tables_read = []
@@ -247,7 +247,7 @@ def _parse_query(stmt) -> QueryInfo:
         if join_table:
             joins.append(f"{join.args.get('kind', '')} JOIN {join_table.name}".strip())
 
-    # Colonnes r�f�renc�es
+    # Colonnes référencées
     columns = [
         ColumnRef(name=col.name, table=col.table or None)
         for col in stmt.find_all(exp.Column)
@@ -294,7 +294,7 @@ def parse_sql_file(source: str, file_path: str, dialect: str = "ansi") -> SqlFil
         statements = fallback_statements
 
     if not statements:
-        # En cas d'erreur fatale, on retourne un r�sultat vide plut�t que de crasher
+        # En cas d'erreur fatale, on retourne un résultat vide plutét que de crasher
         return SqlFileInfo(schemas=[], queries=[], source_file=file_path)
 
     for stmt in statements:

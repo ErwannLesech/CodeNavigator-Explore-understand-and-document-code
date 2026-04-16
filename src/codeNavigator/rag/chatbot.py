@@ -51,7 +51,7 @@ class CodeNavigatorChatbot:
         """Construit l'historique de conversation pour l'API Mistral."""
         messages = [{"role": "system", "content": RAG_SYSTEM_PROMPT}]
 
-        # Injecter l'historique (fen�tre glissante de 6 derniers �changes)
+        # Injecter l'historique (fenétre glissante de 6 derniers échanges)
         for msg in self.history[-6:]:
             messages.append({"role": msg.role, "content": msg.content})
 

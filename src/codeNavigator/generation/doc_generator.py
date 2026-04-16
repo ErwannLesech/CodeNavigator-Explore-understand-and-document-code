@@ -24,20 +24,20 @@ class DocGenerator:
             )
         self.client = Mistral(api_key=api_key)
         self.model = model
-        self.delay = delay  # d�lai entre les appels pour �viter le rate limit
+        self.delay = delay  # délai entre les appels pour éviter le rate limit
         self._call_count = 0
 
     @staticmethod
     def _sanitize_markdown_response(content: str) -> str:
         cleaned = content.strip()
         cleaned = re.sub(
-            r"```(?:markdown|md)\\s*\\n([\\s\\S]*?)```",
+            r"```(?:markdown|md)\s*\n([\s\S]*?)```",
             r"\1",
             cleaned,
             flags=re.IGNORECASE,
         )
 
-        wrapped = re.match(r"^```[\\w-]*\\s*\\n([\\s\\S]*?)\\n```$", cleaned)
+        wrapped = re.match(r"^```[\w-]*\s*\n([\s\S]*?)\n```$", cleaned)
         if wrapped:
             cleaned = wrapped.group(1)
 

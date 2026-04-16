@@ -14,13 +14,13 @@ class NodeType(str, Enum):
 class EdgeType(str, Enum):
     IMPORTS = "imports"  # module A importe module B
     CONTAINS = "contains"  # module contient classe/fonction
-    INHERITS = "inherits"  # classe h�rite de classe
+    INHERITS = "inherits"  # classe hérite de classe
     CALLS = "calls"  # fonction appelle fonction (best-effort)
-    READS_TABLE = "reads_table"  # requ�te lit une table
-    WRITES_TABLE = "writes_table"  # requ�te �crit dans une table
+    READS_TABLE = "reads_table"  # requéte lit une table
+    WRITES_TABLE = "writes_table"  # requéte écrit dans une table
     HAS_COLUMN = "has_column"  # table a une colonne
-    FOREIGN_KEY = "foreign_key"  # colonne r�f�rence une autre table
-    DEPENDS_ON = "depends_on"  # table cible d�pend d'une table source
+    FOREIGN_KEY = "foreign_key"  # colonne référence une autre table
+    DEPENDS_ON = "depends_on"  # table cible dépend d'une table source
 
 
 @dataclass

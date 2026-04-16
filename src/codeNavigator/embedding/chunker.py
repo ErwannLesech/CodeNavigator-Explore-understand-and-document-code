@@ -8,7 +8,7 @@ from src.codeNavigator.ingestion.sql_parser import TableSchema, QueryInfo
 
 @dataclass
 class Chunk:
-    """Unit� minimale indexable."""
+    """Unité minimale indexable."""
 
     chunk_id: str  # identifiant unique : "path/to/file.py::MyClass::my_method"
     content: str  # texte qui sera embed�
@@ -29,7 +29,7 @@ def _build_id(*parts: Optional[str]) -> str:
 def _format_function(
     func: FunctionInfo, file_path: str, parent: Optional[str] = None
 ) -> Chunk:
-    """Formate une fonction/m�thode en texte enrichi pour l'embedding."""
+    """Formate une fonction/méthode en texte enrichi pour l'embedding."""
     args_str = ", ".join(func.args)
     lines = [
         f"{'Method' if func.is_method else 'Function'}: {func.name}",

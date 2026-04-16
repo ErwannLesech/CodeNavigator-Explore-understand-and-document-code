@@ -56,15 +56,15 @@ class GraphBuilder:
             )
         )
 
-        # R�solution des imports vers d'autres modules du projet
+        # Résolution des imports vers d'autres modules du projet
         for imp in info.imports:
-            # Extraire le nom du module import�
+            # Extraire le nom du module importé
             # "from src.codeNavigator.ingestion.parser_dispatcher import ParsedFile" -> "ingestion/parser_dispatcher.py"
             match = re.match(r"(?:from|import)\s+([\w.]+)", imp)
             if match:
                 imported = match.group(1).replace(".", "/") + ".py"
                 imported_id = f"module::{imported}"
-                # On cr�e un noeud placeholder si le module cible n'existe pas encore
+                # On crée un noeud placeholder si le module cible n'existe pas encore
                 if not self._node_exists(imported_id):
                     self._add_node(
                         Node(
@@ -101,7 +101,7 @@ class GraphBuilder:
                 Edge(source=module_id, target=func_id, edge_type=EdgeType.CONTAINS)
             )
 
-        # Classes + m�thodes
+        # Classes + méthodes
         for cls in info.classes:
             class_id = f"class::{file_path}::{cls.name}"
             self._add_node(
@@ -121,7 +121,7 @@ class GraphBuilder:
                 Edge(source=module_id, target=class_id, edge_type=EdgeType.CONTAINS)
             )
 
-            # H�ritage
+            # Héritage
             for base in cls.bases:
                 base_id = f"class::external::{base}"
                 if not self._node_exists(base_id):
@@ -137,7 +137,7 @@ class GraphBuilder:
                     Edge(source=class_id, target=base_id, edge_type=EdgeType.INHERITS)
                 )
 
-            # M�thodes
+            # Méthodes
             for method in cls.methods:
                 method_id = f"method::{file_path}::{cls.name}::{method.name}"
                 self._add_node(
@@ -232,7 +232,7 @@ class GraphBuilder:
                     )
                 )
 
-        # Lineage des requ�tes
+        # Lineage des requétes
         for query in info.queries:
             read_tables: list[str] = []
             written_tables: list[str] = []
@@ -274,7 +274,7 @@ class GraphBuilder:
                     )
                 )
 
-            # Impact table -> table : toutes les sources alimentant toutes les cibles �crites.
+            # Impact table -> table : toutes les sources alimentant toutes les cibles écrites.
             for src_table in read_tables:
                 for dst_table in written_tables:
                     if src_table == dst_table:
@@ -292,7 +292,7 @@ class GraphBuilder:
                     )
 
     # ------------------------------------------------------------------ #
-    # Point d'entr�e
+    # Point d'entrée
     # ------------------------------------------------------------------ #
 
     def ingest(self, parsed_files: list[ParsedFile]) -> nx.DiGraph:

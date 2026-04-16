@@ -9,7 +9,7 @@ from src.codeNavigator.rag.chatbot import CodeNavigatorChatbot
 def run_chat_cli(graph_json_path: Optional[str] = None):
     print(
         Panel.fit(
-            "[bold blue]CodeNavigator[/bold blue] � Chatbot RAG\n"
+            "[bold blue]CodeNavigator[/bold blue] é Chatbot RAG\n"
             "[dim]Interroge ta codebase en langage naturel[/dim]\n"
             "[dim]Commandes : /reset  /sources  /quit[/dim]"
         )
@@ -31,12 +31,12 @@ def run_chat_cli(graph_json_path: Optional[str] = None):
             break
         if query == "/reset":
             bot.reset()
-            print("[dim]Historique effac�.[/dim]")
+            print("[dim]Historique effacé.[/dim]")
             continue
         if query == "/sources":
             show_sources = not show_sources
             print(
-                f"[dim]Affichage des sources : {'activ�' if show_sources else 'd�sactiv�'}[/dim]"
+                f"[dim]Affichage des sources : {'activé' if show_sources else 'désactivé'}[/dim]"
             )
             continue
 
@@ -48,5 +48,5 @@ def run_chat_cli(graph_json_path: Optional[str] = None):
             print("\n[dim]Sources :[/dim]")
             for i, src in enumerate(response.sources, 1):
                 print(
-                    f"  [dim][{i}] {src.source_file} ({src.chunk_type}) � score: {src.score:.3f}[/dim]"
+                    f"  [dim][{i}] {src.source_file} ({src.chunk_type}) é score: {src.score:.3f}[/dim]"
                 )

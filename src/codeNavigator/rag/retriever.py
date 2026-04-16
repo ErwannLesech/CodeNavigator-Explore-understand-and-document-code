@@ -56,7 +56,7 @@ class Retriever:
         ]
 
     def format_context(self, contexts: list[RetrievedContext]) -> str:
-        """Formate les chunks r�cup�r�s en bloc de contexte pour le prompt."""
+        """Formate les chunks récupérés en bloc de contexte pour le prompt."""
         parts = []
         for i, ctx in enumerate(contexts, 1):
             parts.append(

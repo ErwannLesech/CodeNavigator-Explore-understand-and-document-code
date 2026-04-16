@@ -89,12 +89,12 @@ def build_project_doc(
             progress_callback(completed_steps, total_steps, label)
 
     for file_path, file_chunks in grouped.items():
-        # Trier les chunks par type pour respecter l'ordre de g�n�ration
+        # Trier les chunks par type pour respecter l'ordre de génération
         functions = [c for c in file_chunks if c.chunk_type == "function"]
         methods = [c for c in file_chunks if c.chunk_type == "method"]
         classes = [c for c in file_chunks if c.chunk_type == "class"]
         tables = [c for c in file_chunks if c.chunk_type == "table_schema"]
-        # sql_query : pas de doc LLM individuelle, utilis� uniquement au niveau module
+        # sql_query : pas de doc LLM individuelle, utilisé uniquement au niveau module
 
         function_docs = {}
         class_docs = {}
@@ -107,14 +107,14 @@ def build_project_doc(
                 function_docs[name] = generator.document_function(chunk)
                 _notify_progress(f"function:{name}")
 
-        # 2. M�thodes group�es par classe
+        # 2. Méthodes groupées par classe
         methods_by_class: dict[str, list[Chunk]] = defaultdict(list)
         for chunk in methods:
             parent = chunk.metadata.get("parent_class", "__unknown__")
             methods_by_class[parent].append(chunk)
 
         if not compact_mode:
-            # 3. Classes � inject�es avec les docs de leurs m�thodes
+            # 3. Classes é injectées avec les docs de leurs méthodes
             for chunk in classes:
                 class_name = chunk.metadata.get("name", chunk.chunk_id)
                 related_method_docs = [
@@ -126,7 +126,7 @@ def build_project_doc(
                 )
                 _notify_progress(f"class:{class_name}")
 
-                # Documenter les m�thodes individuellement aussi
+                # Documenter les méthodes individuellement aussi
                 for method_chunk in methods_by_class.get(class_name, []):
                     method_name = method_chunk.metadata.get(
                         "name", method_chunk.chunk_id
@@ -175,7 +175,7 @@ def build_project_doc(
     modules_summary = [
         {
             "file": m.file_path,
-            # On injecte uniquement le r�sum� du module, pas toute la doc
+            # On injecte uniquement le résumé du module, pas toute la doc
             "summary": m.module_doc[:300],
         }
         for m in module_docs

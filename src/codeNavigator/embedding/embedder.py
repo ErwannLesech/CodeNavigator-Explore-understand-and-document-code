@@ -22,7 +22,7 @@ class Embedder:
         self.client = Mistral(api_key=api_key)
 
     def embed_chunks(self, chunks: list[Chunk]) -> list[list[float]]:
-        """G�n�re les embeddings par batch pour �viter les rate limits."""
+        """Génére les embeddings par batch pour éviter les rate limits."""
         all_embeddings = []
 
         for i in range(0, len(chunks), BATCH_SIZE):
@@ -42,7 +42,7 @@ class Embedder:
         return all_embeddings
 
     def embed_query(self, query: str) -> list[float]:
-        """Embed une requ�te utilisateur pour la recherche."""
+        """Embed une requéte utilisateur pour la recherche."""
         response = self.client.embeddings.create(model=EMBEDDING_MODEL, inputs=[query])
         if response is None or response.data is None or not response.data:
             raise RuntimeError("Embedding API returned an empty response")

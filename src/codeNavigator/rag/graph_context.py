@@ -61,7 +61,7 @@ class GraphContextProvider:
 
     def get_context_for_chunks(self, contexts: list[RetrievedContext]) -> str:
         """
-        Pour chaque chunk r�cup�r�, cherche les relations directes
+        Pour chaque chunk récupéré, cherche les relations directes
         dans le graph et les retourne sous forme textuelle.
         """
         lines = []
