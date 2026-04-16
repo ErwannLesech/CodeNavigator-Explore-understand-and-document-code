@@ -110,10 +110,9 @@ jobs:
       - name: Install project dependencies (if requirements.txt exists)
         id: install_requirements
         run: |
-          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then
-            printf '%s\n' 'pydantic>=2.9.0,<3.0.0' 'mistralai==1.2.6' > constraints-ci.txt
-            pip install -r requirements.txt -c constraints-ci.txt
+            pip install -r requirements.txt
           else
             echo "requirements.txt not found, skipping dependency installation."
           fi
@@ -124,13 +123,46 @@ jobs:
       - name: Run pytest with coverage
         id: pytest_run
         env:
-          PYTHONPATH: ${{ github.workspace }}
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: pytest --cov=src --cov-report=term-missing --cov-report=xml:coverage.xml 2>&1 | tee pytest_output.txt
+
+      - name: Display coverage report
+        if: always()
         run: |
-          if [ -d tests/ingestion ] && find tests/ingestion -type f -name 'test_*.py' | grep -q .; then
-            pytest tests/ingestion --cov=ingestion --cov-report=term-missing
-          else
-            echo "No ingestion test files found under tests/ingestion (test_*.py). Skipping pytest."
-          fi
+          echo "## Coverage Report Output"
+          echo '```'
+          cat pytest_output.txt
+          echo '```'
+
+      - name: Read coverage metrics
+        id: coverage_metrics
+        if: always()
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          coverage_file = Path("coverage.xml")
+          if not coverage_file.exists():
+              print("coverage_pct=0.00")
+              print("lines_valid=0")
+              print("lines_covered=0")
+              print("coverage_missing=true")
+              raise SystemExit(0)
+
+          root = ET.parse(coverage_file).getroot()
+          line_rate = float(root.attrib.get("line-rate", "0"))
+          lines_valid = int(root.attrib.get("lines-valid", "0"))
+          lines_covered = int(root.attrib.get("lines-covered", "0"))
+          pct = line_rate * 100
+
+          github_output = Path(__import__("os").environ["GITHUB_OUTPUT"])
+          with github_output.open("a", encoding="utf-8") as output:
+              output.write(f"coverage_pct={pct:.2f}\n")
+              output.write(f"lines_valid={lines_valid}\n")
+              output.write(f"lines_covered={lines_covered}\n")
+              output.write("coverage_missing=false\n")
+          PY
 
       - name: Write test summary
         if: always()
@@ -141,5 +173,20 @@ jobs:
             echo "| Step | Result |"
             echo "|---|---|"
             echo "| Install dependencies | ${{ steps.install_requirements.outcome }} |"
-            echo "| pytest tests/ingestion --cov=ingestion --cov-report=term-missing | ${{ steps.pytest_run.outcome }} |"
+            echo "| pytest --cov=src --cov-report=term-missing --cov-report=xml:coverage.xml | ${{ steps.pytest_run.outcome }} |"
+            echo ""
+            echo "### Coverage Details"
+            if [ "${{ steps.coverage_metrics.outputs.coverage_missing }}" = "true" ]; then
+              echo "Coverage report not generated."
+            else
+              echo "- Global line coverage: **${{ steps.coverage_metrics.outputs.coverage_pct }}%**"
+              echo "- Covered lines: **${{ steps.coverage_metrics.outputs.lines_covered }} / ${{ steps.coverage_metrics.outputs.lines_valid }}**"
+            fi
+            echo ""
+            echo "### Full Coverage Report"
+            echo '```'
+            if [ -f pytest_output.txt ]; then
+              tail -50 pytest_output.txt
+            fi
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
