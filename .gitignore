@@ -214,3 +214,4 @@ qdrant_local/
 frontend/node_modules/
 save_business_vault_output/
 docs/
+frontend/.vite/
