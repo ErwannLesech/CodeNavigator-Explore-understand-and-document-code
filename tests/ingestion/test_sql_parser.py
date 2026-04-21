@@ -1,4 +1,4 @@
-from src.codeNavigator.ingestion.sql_parser import parse_sql_file
+from src.ingestion.sql_parser import parse_sql_file
 
 
 def test_parse_sql_file_extracts_schema_and_query() -> None:

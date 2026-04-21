@@ -1,6 +1,6 @@
-from src.codeNavigator.embedding.chunker import Chunk
-from src.codeNavigator.generation.doc_generator import DocGenerator
-from src.codeNavigator.generation.prompts import (
+from src.embedding.chunker import Chunk
+from src.generation.doc_generator import DocGenerator
+from src.generation.prompts import (
     prompt_for_class,
     prompt_for_function,
     prompt_for_module,

@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from src.codeNavigator.graph.json_exporter import export_graph_json
-from src.codeNavigator.graph.models import Edge, EdgeType, Node, NodeType
+from src.graph.json_exporter import export_graph_json
+from src.graph.models import Edge, EdgeType, Node, NodeType
 
 
 def test_export_graph_json_serializes_nodes_edges_and_stats(tmp_path: Path) -> None:

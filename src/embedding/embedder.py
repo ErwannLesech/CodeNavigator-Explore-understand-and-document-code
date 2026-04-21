@@ -2,7 +2,7 @@
 import os
 import time
 from mistralai import Mistral
-from src.codeNavigator.embedding.chunker import Chunk
+from src.embedding.chunker import Chunk
 import dotenv
 
 dotenv.load_dotenv()  # charge les variables d'environnement depuis le fichier .env

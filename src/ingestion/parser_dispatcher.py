@@ -1,10 +1,10 @@
 # ingestion/parser_dispatcher.py
 from dataclasses import dataclass
 from typing import Optional
-from src.codeNavigator.ingestion.repo_walker import SourceFile
-from src.codeNavigator.ingestion.python_parser import parse_python_file, ModuleInfo
-from src.codeNavigator.ingestion.sql_parser import parse_sql_file, SqlFileInfo
-from src.codeNavigator.ingestion.treesitter_parser import (
+from src.ingestion.repo_walker import SourceFile
+from src.ingestion.python_parser import parse_python_file, ModuleInfo
+from src.ingestion.sql_parser import parse_sql_file, SqlFileInfo
+from src.ingestion.treesitter_parser import (
     parse_with_treesitter,
     TreeSitterResult,
 )

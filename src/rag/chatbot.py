@@ -4,9 +4,9 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 from mistralai import Mistral
-from src.codeNavigator.rag.retriever import Retriever, RetrievedContext
-from src.codeNavigator.rag.graph_context import GraphContextProvider
-from src.codeNavigator.generation.prompts import RAG_SYSTEM_PROMPT, prompt_rag
+from src.rag.retriever import Retriever, RetrievedContext
+from src.rag.graph_context import GraphContextProvider
+from src.generation.prompts import RAG_SYSTEM_PROMPT, prompt_rag
 
 
 @dataclass

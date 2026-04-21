@@ -1,8 +1,8 @@
 # rag/retriever.py
 from dataclasses import dataclass
 from typing import Optional
-from src.codeNavigator.embedding.embedder import Embedder
-from src.codeNavigator.embedding.vector_store import VectorStore
+from src.embedding.embedder import Embedder
+from src.embedding.vector_store import VectorStore
 
 
 @dataclass

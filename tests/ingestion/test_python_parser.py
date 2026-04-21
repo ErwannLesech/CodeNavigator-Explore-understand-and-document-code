@@ -1,4 +1,4 @@
-from src.codeNavigator.ingestion.python_parser import parse_python_file
+from src.ingestion.python_parser import parse_python_file
 
 
 def test_parse_python_file_extracts_module_structure() -> None:

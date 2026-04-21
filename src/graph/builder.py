@@ -1,10 +1,10 @@
 # graph/builder.py
 import re
 import networkx as nx
-from src.codeNavigator.ingestion.parser_dispatcher import ParsedFile
-from src.codeNavigator.ingestion.python_parser import ModuleInfo
-from src.codeNavigator.ingestion.sql_parser import SqlFileInfo
-from src.codeNavigator.graph.models import Node, Edge, NodeType, EdgeType
+from src.ingestion.parser_dispatcher import ParsedFile
+from src.ingestion.python_parser import ModuleInfo
+from src.ingestion.sql_parser import SqlFileInfo
+from src.graph.models import Node, Edge, NodeType, EdgeType
 
 
 class GraphBuilder:
@@ -59,7 +59,7 @@ class GraphBuilder:
         # Résolution des imports vers d'autres modules du projet
         for imp in info.imports:
             # Extraire le nom du module importé
-            # "from src.codeNavigator.ingestion.parser_dispatcher import ParsedFile" -> "ingestion/parser_dispatcher.py"
+            # "from src.ingestion.parser_dispatcher import ParsedFile" -> "ingestion/parser_dispatcher.py"
             match = re.match(r"(?:from|import)\s+([\w.]+)", imp)
             if match:
                 imported = match.group(1).replace(".", "/") + ".py"

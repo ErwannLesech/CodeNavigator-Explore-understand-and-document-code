@@ -1,9 +1,9 @@
 # embedding/indexer.py
-from src.codeNavigator.ingestion.repo_walker import walk_repo
-from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
-from src.codeNavigator.embedding.chunker import chunk_parsed_file, Chunk
-from src.codeNavigator.embedding.embedder import Embedder
-from src.codeNavigator.embedding.vector_store import VectorStore
+from src.ingestion.repo_walker import walk_repo
+from src.ingestion.parser_dispatcher import dispatch_parser
+from src.embedding.chunker import chunk_parsed_file, Chunk
+from src.embedding.embedder import Embedder
+from src.embedding.vector_store import VectorStore
 
 
 def run_indexing(

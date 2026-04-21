@@ -1,7 +1,7 @@
 # backend/chat.py
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from src.codeNavigator.rag.chatbot import CodeNavigatorChatbot
+from src.rag.chatbot import CodeNavigatorChatbot
 import os
 from typing import Optional
 
