@@ -32,39 +32,38 @@ CodeNavigator/
 |- backend/
 |  `- chat.py
 |- src/
-|  `- codeNavigator/
-|     |- embedding/
-|     |  |- chunker.py
-|     |  |- embedder.py
-|     |  |- indexer.py
-|     |  `- vector_store.py
-|     |- generation/
-|     |  |- assembler.py
-|     |  |- doc_generator.py
-|     |  |- exporter.py
-|     |  `- prompts.py
-|     |- graph/
-|     |  |- builder.py
-|     |  |- json_exporter.py
-|     |  `- models.py
-|     |- ingestion/
-|     |  |- parser_dispatcher.py
-|     |  |- python_parser.py
-|     |  |- repo_walker.py
-|     |  |- sql_parser.py
-|     |  `- treesitter_parser.py
-|     `- rag/
-|        |- chatbot.py
-|        |- cli.py
-|        |- graph_context.py
-|        `- retriever.py
+|  |- embedding/
+|  |  |- chunker.py
+|  |  |- embedder.py
+|  |  |- indexer.py
+|  |  `- vector_store.py
+|  |- generation/
+|  |  |- assembler.py
+|  |  |- doc_generator.py
+|  |  |- exporter.py
+|  |  `- prompts.py
+|  |- graph/
+|  |  |- builder.py
+|  |  |- json_exporter.py
+|  |  `- models.py
+|  |- ingestion/
+|  |  |- parser_dispatcher.py
+|  |  |- python_parser.py
+|  |  |- repo_walker.py
+|  |  |- sql_parser.py
+|  |  `- treesitter_parser.py
+|  |- rag/
+|  |  |- chatbot.py
+|  |  |- cli.py
+|  |  |- graph_context.py
+|  |  `- retriever.py
+|  `- main.py
 |- frontend/
 |- tests/
 |  `- ingestion/
 |- data/
 |  |- input/
 |  `- output/
-|- main.py
 `- requirements.txt
 ```
 
@@ -135,42 +134,42 @@ GRAPH_JSON_PATH=data/output/graph/graph.json
 
 ## Utilisation CLI
 
-La CLI principale est dans main.py.
+La CLI principale est dans src/main.py.
 
 ### 1) Indexer une codebase
 
 ```bash
-python main.py index --repo <path_ou_git_url>
+python -m src.main index --repo <path_ou_git_url>
 ```
 
 Mode validation sans appels embeddings:
 
 ```bash
-python main.py index --repo <path_ou_git_url> --dry-run
+python -m src.main index --repo <path_ou_git_url> --dry-run
 ```
 
 ### 2) Generer la documentation Markdown
 
 ```bash
-python main.py generate --repo <path_ou_git_url> --output data/output/docs
+python -m src.main generate --repo <path_ou_git_url> --output data/output/docs
 ```
 
 ### 3) Generer le knowledge graph
 
 ```bash
-python main.py graph --repo <path_ou_git_url> --output data/output/graph
+python -m src.main graph --repo <path_ou_git_url> --output data/output/graph
 ```
 
 ### 4) Lancer le pipeline complet
 
 ```bash
-python main.py full --repo <path_ou_git_url> --output data/output/docs
+python -m src.main full --repo <path_ou_git_url> --output data/output/docs
 ```
 
 ### 5) Lancer le chatbot RAG en CLI
 
 ```bash
-python main.py chat --graph data/output/graph/graph.json
+python -m src.main chat --graph data/output/graph/graph.json
 ```
 
 Commandes utiles dans le chat:
@@ -184,9 +183,9 @@ Commandes utiles dans le chat:
 Utiliser le repo d'exemple fourni:
 
 ```bash
-python main.py graph --repo data/input/sample_repo --output data/output/graph
-python main.py generate --repo data/input/sample_repo --output data/output/docs
-python main.py chat --graph data/output/graph/graph.json
+python -m src.main graph --repo data/input/sample_repo --output data/output/graph
+python -m src.main generate --repo data/input/sample_repo --output data/output/docs
+python -m src.main chat --graph data/output/graph/graph.json
 ```
 
 ## Endpoint API Chat (FastAPI)

@@ -1,7 +1,7 @@
 # rag/graph_context.py
 import json
 from pathlib import Path
-from src.codeNavigator.rag.retriever import RetrievedContext
+from src.rag.retriever import RetrievedContext
 
 
 class GraphContextProvider:

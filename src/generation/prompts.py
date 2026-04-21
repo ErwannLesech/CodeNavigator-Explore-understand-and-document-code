@@ -1,4 +1,4 @@
-from src.codeNavigator.embedding.chunker import Chunk
+from src.embedding.chunker import Chunk
 
 
 SYSTEM_PROMPT = """Tu es un ingenieur logiciel senior charge de rediger de la documentation technique.

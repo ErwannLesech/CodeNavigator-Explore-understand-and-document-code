@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from collections import defaultdict
 from typing import Callable
 
-from src.codeNavigator.embedding.chunker import Chunk
-from src.codeNavigator.generation.doc_generator import DocGenerator
+from src.embedding.chunker import Chunk
+from src.generation.doc_generator import DocGenerator
 
 
 @dataclass

@@ -13,19 +13,19 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from src.codeNavigator.embedding.chunker import chunk_parsed_file
-from src.codeNavigator.embedding.embedder import Embedder
-from src.codeNavigator.embedding.vector_store import COLLECTION_NAME, VectorStore
-from src.codeNavigator.generation.assembler import (
+from src.embedding.chunker import chunk_parsed_file
+from src.embedding.embedder import Embedder
+from src.embedding.vector_store import COLLECTION_NAME, VectorStore
+from src.generation.assembler import (
     build_project_doc,
     estimate_doc_workload,
 )
-from src.codeNavigator.generation.doc_generator import DocGenerator
-from src.codeNavigator.generation.exporter import export_to_markdown
-from src.codeNavigator.graph.builder import GraphBuilder
-from src.codeNavigator.graph.json_exporter import export_graph_json
-from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
-from src.codeNavigator.ingestion.repo_walker import walk_repo
+from src.generation.doc_generator import DocGenerator
+from src.generation.exporter import export_to_markdown
+from src.graph.builder import GraphBuilder
+from src.graph.json_exporter import export_graph_json
+from src.ingestion.parser_dispatcher import dispatch_parser
+from src.ingestion.repo_walker import walk_repo
 
 from backend.chat import router as chat_router
 

@@ -10,7 +10,7 @@ from qdrant_client.models import (
     FieldCondition,
     MatchValue,
 )
-from src.codeNavigator.embedding.chunker import Chunk
+from src.embedding.chunker import Chunk
 import uuid
 from typing import Any, Iterable, Optional, cast
 

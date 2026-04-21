@@ -1,15 +1,15 @@
 import argparse
-from src.codeNavigator.embedding.indexer import run_indexing
-from src.codeNavigator.generation.assembler import build_project_doc
-from src.codeNavigator.generation.doc_generator import DocGenerator
-from src.codeNavigator.generation.exporter import export_to_markdown
+from src.embedding.indexer import run_indexing
+from src.generation.assembler import build_project_doc
+from src.generation.doc_generator import DocGenerator
+from src.generation.exporter import export_to_markdown
 
-from src.codeNavigator.ingestion.repo_walker import walk_repo
-from src.codeNavigator.ingestion.parser_dispatcher import dispatch_parser
-from src.codeNavigator.graph.builder import GraphBuilder
-from src.codeNavigator.graph.json_exporter import export_graph_json
+from src.ingestion.repo_walker import walk_repo
+from src.ingestion.parser_dispatcher import dispatch_parser
+from src.graph.builder import GraphBuilder
+from src.graph.json_exporter import export_graph_json
 
-from src.codeNavigator.rag.cli import run_chat_cli
+from src.rag.cli import run_chat_cli
 
 
 def main():

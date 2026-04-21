@@ -1,7 +1,7 @@
 # graph/json_exporter.py
 import json
 from pathlib import Path
-from src.codeNavigator.graph.models import Node, Edge
+from src.graph.models import Node, Edge
 
 
 def export_graph_json(

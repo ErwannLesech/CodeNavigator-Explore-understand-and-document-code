@@ -1,9 +1,9 @@
 # embedding/chunker.py
 from dataclasses import dataclass, field
 from typing import Optional
-from src.codeNavigator.ingestion.parser_dispatcher import ParsedFile
-from src.codeNavigator.ingestion.python_parser import FunctionInfo, ClassInfo
-from src.codeNavigator.ingestion.sql_parser import TableSchema, QueryInfo
+from src.ingestion.parser_dispatcher import ParsedFile
+from src.ingestion.python_parser import FunctionInfo, ClassInfo
+from src.ingestion.sql_parser import TableSchema, QueryInfo
 
 
 @dataclass

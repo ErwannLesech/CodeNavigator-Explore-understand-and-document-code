@@ -4,8 +4,8 @@ import time
 import logging
 from typing import Optional
 from mistralai import Mistral
-from src.codeNavigator.embedding.chunker import Chunk
-from src.codeNavigator.generation.prompts import (
+from src.embedding.chunker import Chunk
+from src.generation.prompts import (
     SYSTEM_PROMPT,
     prompt_for_function,
     prompt_for_class,

@@ -3,7 +3,7 @@ from rich import print
 from rich.panel import Panel
 from rich.prompt import Prompt
 from typing import Optional
-from src.codeNavigator.rag.chatbot import CodeNavigatorChatbot
+from src.rag.chatbot import CodeNavigatorChatbot
 
 
 def run_chat_cli(graph_json_path: Optional[str] = None):
