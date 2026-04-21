@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import logging
 from typing import Optional
 from mistralai import Mistral
 from src.codeNavigator.embedding.chunker import Chunk
@@ -14,8 +15,16 @@ from src.codeNavigator.generation.prompts import (
 )
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 class DocGenerator:
-    def __init__(self, model: str = "mistral-large-latest", delay: float = 0.15):
+    def __init__(
+        self,
+        model: str = "mistral-large-latest",
+        delay: float = 0.15,
+        fallback_model: str = "mistral-medium-latest",
+    ):
         api_key = os.getenv("MISTRAL_API_KEY")
         if not api_key:
             raise ValueError(
@@ -24,7 +33,9 @@ class DocGenerator:
             )
         self.client = Mistral(api_key=api_key)
         self.model = model
+        self.fallback_model = fallback_model
         self.delay = delay  # délai entre les appels pour éviter le rate limit
+        self.retry_attempts = 3
         self._call_count = 0
 
     @staticmethod
@@ -43,19 +54,92 @@ class DocGenerator:
 
         return cleaned.strip()
 
-    def _call(self, prompt: str, max_tokens: int = 420) -> str:
-        self._call_count += 1
-        if self._call_count > 1:
-            time.sleep(self.delay)
+    @staticmethod
+    def _extract_error_status_code(error: Exception) -> Optional[int]:
+        status = getattr(error, "status_code", None)
+        if isinstance(status, int):
+            return status
 
-        response = self.client.chat.complete(
-            model=self.model,
+        response = getattr(error, "response", None)
+        response_status = getattr(response, "status_code", None)
+        if isinstance(response_status, int):
+            return response_status
+
+        return None
+
+    def _is_retryable_llm_error(self, error: Exception) -> bool:
+        status_code = self._extract_error_status_code(error)
+        if status_code in {408, 429, 500, 502, 503, 504}:
+            return True
+
+        message = str(error).lower()
+        retryable_patterns = (
+            "rate limit",
+            "too many requests",
+            "timeout",
+            "temporarily unavailable",
+            "overloaded",
+        )
+        return any(pattern in message for pattern in retryable_patterns)
+
+    def _complete_once(self, prompt: str, max_tokens: int, model: str):
+        return self.client.chat.complete(
+            model=model,
             max_tokens=max_tokens,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
         )
+
+    def _invoke_with_retries(self, prompt: str, max_tokens: int, model: str):
+        for attempt in range(1, self.retry_attempts + 1):
+            try:
+                return self._complete_once(prompt, max_tokens, model)
+            except Exception as error:
+                retryable = self._is_retryable_llm_error(error)
+                if attempt >= self.retry_attempts or not retryable:
+                    raise
+
+                wait_seconds = self.delay * (2 ** (attempt - 1))
+                status_code = self._extract_error_status_code(error)
+                LOGGER.warning(
+                    "LLM call failed (model=%s, status=%s, attempt=%d/%d): %s. "
+                    "Retry in %.2fs.",
+                    model,
+                    status_code,
+                    attempt,
+                    self.retry_attempts,
+                    error,
+                    wait_seconds,
+                )
+                time.sleep(wait_seconds)
+
+    def _call(self, prompt: str, max_tokens: int = 420) -> str:
+        self._call_count += 1
+        if self._call_count > 1:
+            time.sleep(self.delay)
+
+        try:
+            response = self._invoke_with_retries(prompt, max_tokens, self.model)
+        except Exception as primary_error:
+            if not self.fallback_model or self.fallback_model == self.model:
+                raise
+
+            LOGGER.warning(
+                "Primary model '%s' failed after retries (%s). "
+                "Switching to fallback model '%s'.",
+                self.model,
+                primary_error,
+                self.fallback_model,
+            )
+            response = self._invoke_with_retries(
+                prompt,
+                max_tokens,
+                self.fallback_model,
+            )
+            self.model = self.fallback_model
+
         if response is None or response.choices is None or not response.choices:
             raise RuntimeError("LLM API returned an empty response")
 
