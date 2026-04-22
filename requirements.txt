@@ -6,7 +6,7 @@ sqlglot==25.0.0
 gitpython==3.1.43
 
 # Phase 2 - Embedding (a decommenter quand tu attaques la phase 2)
-# qdrant-client==1.9.1
+qdrant-client==1.9.1
 mistralai==1.2.6
 # tiktoken==0.7.0
 
