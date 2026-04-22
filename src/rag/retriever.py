@@ -16,9 +16,19 @@ class RetrievedContext:
 
 
 class Retriever:
-    def __init__(self, top_k: int = 6):
+    def __init__(
+        self,
+        top_k: int = 6,
+        qdrant_host: str = "localhost",
+        qdrant_port: int = 6333,
+        qdrant_collection: str = "CodeNavigatorChunks",
+    ):
         self.embedder = Embedder()
-        self.store = VectorStore()
+        self.store = VectorStore(
+            host=qdrant_host,
+            port=qdrant_port,
+            collection_name=qdrant_collection,
+        )
         self.top_k = top_k
 
     def retrieve(

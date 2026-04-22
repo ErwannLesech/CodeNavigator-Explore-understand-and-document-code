@@ -10,11 +10,14 @@ def run_indexing(
     repo_path: str,
     qdrant_host: str = "localhost",
     qdrant_port: int = 6333,
+    qdrant_collection: str = "CodeNavigatorChunks",
     recreate_collection: bool = False,
     sql_dialect: str = "ansi",
     dry_run: bool = False,  # si True : parse et chunke mais n'appelle pas l'API embedding
 ) -> list[Chunk]:
-    store = VectorStore(host=qdrant_host, port=qdrant_port)
+    store = VectorStore(
+        host=qdrant_host, port=qdrant_port, collection_name=qdrant_collection
+    )
     store.create_collection(recreate=recreate_collection)
 
     embedder = Embedder() if not dry_run else None

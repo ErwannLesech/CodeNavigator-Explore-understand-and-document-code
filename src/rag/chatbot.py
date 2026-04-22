@@ -29,11 +29,22 @@ class CodeNavigatorChatbot:
         graph_json_path: Optional[str] = None,
         top_k: int = 6,
         model: str = "mistral-large-latest",
+        qdrant_host: str = "localhost",
+        qdrant_port: int = 6333,
+        qdrant_collection: str = "CodeNavigatorChunks",
     ):
         self.client = Mistral(api_key=os.environ["MISTRAL_API_KEY"])
         self.model = model
-        self.retriever = Retriever(top_k=top_k)
+        self.retriever = Retriever(
+            top_k=top_k,
+            qdrant_host=qdrant_host,
+            qdrant_port=qdrant_port,
+            qdrant_collection=qdrant_collection,
+        )
         self.history: list[Message] = []
+        self.qdrant_host = qdrant_host
+        self.qdrant_port = qdrant_port
+        self.qdrant_collection = qdrant_collection
 
         self.graph_provider = self._init_graph_provider(graph_json_path)
 
@@ -162,6 +173,11 @@ class CodeNavigatorChatbot:
                 },
                 "vector_status": vector_status,
                 "vector_error": vector_error,
+                "vector_store": {
+                    "host": self.qdrant_host,
+                    "port": self.qdrant_port,
+                    "collection": self.qdrant_collection,
+                },
                 "retrieval_context": debug_contexts,
                 "graph_context": graph_context[:4000] if graph_context else "",
                 "prompt_preview": user_prompt[:4000],
