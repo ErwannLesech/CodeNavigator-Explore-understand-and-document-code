@@ -17,22 +17,8 @@ class ParsedFile:
     sql_info: Optional[SqlFileInfo] = None
     ts_result: Optional[TreeSitterResult] = None
 
-    def summary(self) -> str:
-        parts = [f"[{self.source_file.language}] {self.source_file.relative_path}"]
-        if self.python_info:
-            parts.append(
-                f"  {len(self.python_info.functions)} fonctions, {len(self.python_info.classes)} classes"
-            )
-        if self.sql_info:
-            parts.append(
-                f"  {len(self.sql_info.schemas)} tables, {len(self.sql_info.queries)} requetes"
-            )
-        if self.ts_result:
-            parts.append(f"  {len(self.ts_result.units)} unites (tree-sitter)")
-        return "\n".join(parts)
 
-
-def dispatch_parser(source_file: SourceFile, sql_dialect: str = "ansi") -> ParsedFile:
+def dispatch_parser(source_file: SourceFile, sql_dialect: str = "mysql") -> ParsedFile:
     result = ParsedFile(source_file=source_file)
     if source_file.language == "python":
         result.python_info = parse_python_file(
