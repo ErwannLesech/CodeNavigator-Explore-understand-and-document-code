@@ -124,7 +124,7 @@ jobs:
         id: pytest_run
         run: |
           set -o pipefail
-          export PYTHONPATH="${{ github.workspace }}/src"
+          export PYTHONPATH="${{ github.workspace }}:${PYTHONPATH:-}"
           pytest --cov=src --cov-report=term-missing --cov-report=xml:coverage.xml 2>&1 | tee pytest_output.txt
 
       - name: Display coverage report
