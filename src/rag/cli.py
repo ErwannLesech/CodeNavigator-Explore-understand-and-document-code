@@ -6,7 +6,13 @@ from typing import Optional
 from src.rag.chatbot import CodeNavigatorChatbot
 
 
-def run_chat_cli(graph_json_path: Optional[str] = None):
+def run_chat_cli(
+    graph_json_path: Optional[str] = None,
+    qdrant_host: str = "localhost",
+    qdrant_port: int = 6333,
+    qdrant_collection: str = "CodeNavigatorChunks",
+    top_k: int = 6,
+):
     print(
         Panel.fit(
             "[bold blue]CodeNavigator[/bold blue] é Chatbot RAG\n"
@@ -15,7 +21,13 @@ def run_chat_cli(graph_json_path: Optional[str] = None):
         )
     )
 
-    bot = CodeNavigatorChatbot(graph_json_path=graph_json_path)
+    bot = CodeNavigatorChatbot(
+        graph_json_path=graph_json_path,
+        top_k=top_k,
+        qdrant_host=qdrant_host,
+        qdrant_port=qdrant_port,
+        qdrant_collection=qdrant_collection,
+    )
     show_sources = False
 
     while True:

@@ -21,22 +21,28 @@ VECTOR_SIZE = 1024  # text-embedding-3-small
 
 
 class VectorStore:
-    def __init__(self, host: str = "localhost", port: int = 6333):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 6333,
+        collection_name: str = COLLECTION_NAME,
+    ):
         host = os.getenv("QDRANT_HOST", host)
         port = int(os.getenv("QDRANT_PORT", str(port)))
+        self.collection_name = os.getenv("QDRANT_COLLECTION", collection_name)
         self.client = QdrantClient(host=host, port=port)
 
     def create_collection(self, recreate: bool = False):
         existing = [c.name for c in self.client.get_collections().collections]
 
-        if COLLECTION_NAME in existing:
+        if self.collection_name in existing:
             if recreate:
-                self.client.delete_collection(COLLECTION_NAME)
+                self.client.delete_collection(self.collection_name)
             else:
                 return  # déjé existante, on ne touche pas
 
         self.client.create_collection(
-            collection_name=COLLECTION_NAME,
+            collection_name=self.collection_name,
             vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
         )
 
@@ -61,7 +67,7 @@ class VectorStore:
             for chunk, embedding in zip(chunks, embeddings)
         ]
 
-        self.client.upsert(collection_name=COLLECTION_NAME, points=points)
+        self.client.upsert(collection_name=self.collection_name, points=points)
 
     def search(
         self,
@@ -93,7 +99,7 @@ class VectorStore:
         search_fn = getattr(self.client, "search", None)
         if callable(search_fn):
             raw_results = search_fn(
-                collection_name=COLLECTION_NAME,
+                collection_name=self.collection_name,
                 query_vector=query_vector,
                 limit=top_k,
                 query_filter=query_filter,
@@ -102,7 +108,7 @@ class VectorStore:
             results = list(cast(Iterable[Any], raw_results))
         else:
             query_result = self.client.query_points(
-                collection_name=COLLECTION_NAME,
+                collection_name=self.collection_name,
                 query=query_vector,
                 limit=top_k,
                 query_filter=query_filter,
