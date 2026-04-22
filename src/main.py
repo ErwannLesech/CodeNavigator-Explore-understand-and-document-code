@@ -19,6 +19,9 @@ def build_chunks(args):
         recreate_collection=args.recreate,
         sql_dialect=args.dialect,
         dry_run=args.dry_run,
+        qdrant_host=args.qdrant_host,
+        qdrant_port=args.qdrant_port,
+        qdrant_collection=args.qdrant_collection,
     )
 
 
@@ -72,18 +75,27 @@ def parse_args():
         help="Supprime puis recree la collection Qdrant avant indexation",
     )
     idx_cmd.add_argument("--dialect", default="mysql")
+    idx_cmd.add_argument("--qdrant-host", default="localhost")
+    idx_cmd.add_argument("--qdrant-port", type=int, default=6333)
+    idx_cmd.add_argument("--qdrant-collection", default="CodeNavigatorChunks")
 
     # Commande generate
     gen_cmd = subparsers.add_parser("generate", help="Generer la documentation")
     gen_cmd.add_argument("--repo", required=True)
     gen_cmd.add_argument("--output-docs", default="data/output/docs")
     gen_cmd.add_argument("--dialect", default="mysql")
+    gen_cmd.add_argument("--qdrant-host", default="localhost")
+    gen_cmd.add_argument("--qdrant-port", type=int, default=6333)
+    gen_cmd.add_argument("--qdrant-collection", default="CodeNavigatorChunks")
 
     # Commande graph
     graph_cmd = subparsers.add_parser("graph", help="Construire le knowledge graph")
     graph_cmd.add_argument("--repo", required=True)
     graph_cmd.add_argument("--output-graph", default="data/output/graph")
     graph_cmd.add_argument("--dialect", default="mysql")
+    graph_cmd.add_argument("--qdrant-host", default="localhost")
+    graph_cmd.add_argument("--qdrant-port", type=int, default=6333)
+    graph_cmd.add_argument("--qdrant-collection", default="CodeNavigatorChunks")
 
     # Commande full (index + generate + graph)
     full_cmd = subparsers.add_parser("full", help="Pipeline complet")
@@ -97,6 +109,9 @@ def parse_args():
         action="store_true",
         help="Parse + chunk uniquement (sans embeddings, sans ecriture Qdrant)",
     )
+    full_cmd.add_argument("--qdrant-host", default="localhost")
+    full_cmd.add_argument("--qdrant-port", type=int, default=6333)
+    full_cmd.add_argument("--qdrant-collection", default="CodeNavigatorChunks")
 
     chat_cmd = subparsers.add_parser("chat", help="Lancer le chatbot RAG en CLI")
     chat_cmd.add_argument("--graph", default="data/output/graph/graph.json")
@@ -135,6 +150,11 @@ def main():
 
     elif args.command == "chat":
         run_chat(args)
+
+    else:
+        raise ValueError(
+            f"Unknown command: {args.command}, use --help for available commands"
+        )
 
 
 if __name__ == "__main__":
