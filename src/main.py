@@ -153,7 +153,7 @@ def main():
 
     else:
         raise ValueError(
-            f"Unknown command: {args.command}, use --help for available commands"
+            f"Unknown command: {args.command}. Available commands: index, generate, graph, full, chat"
         )
 
 

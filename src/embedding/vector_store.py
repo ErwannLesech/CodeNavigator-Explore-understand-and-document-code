@@ -14,8 +14,6 @@ from src.embedding.chunker import Chunk
 import uuid
 from typing import Any, Iterable, Optional, cast
 
-
-COLLECTION_NAME = "CodeNavigatorChunks"
 VECTOR_SIZE = 1024  # text-embedding-3-small
 # 3072 si tu utilises text-embedding-3-large
 
@@ -25,7 +23,7 @@ class VectorStore:
         self,
         host: str = "localhost",
         port: int = 6333,
-        collection_name: str = COLLECTION_NAME,
+        collection_name: str = "CodeNavigatorChunks",
     ):
         host = os.getenv("QDRANT_HOST", host)
         port = int(os.getenv("QDRANT_PORT", str(port)))
