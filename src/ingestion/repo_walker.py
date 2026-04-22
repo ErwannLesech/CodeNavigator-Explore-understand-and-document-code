@@ -11,8 +11,6 @@ from git import Repo
 SUPPORTED_EXTENSIONS = {
     ".py": "python",
     ".sql": "sql",
-    ".js": "javascript",
-    ".ts": "typescript",
 }
 
 IGNORED_DIRS = {".venv", "node_modules", "__pycache__", ".git", "dist", "build"}

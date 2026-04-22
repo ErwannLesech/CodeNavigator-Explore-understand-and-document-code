@@ -34,18 +34,3 @@ def test_dispatch_parser_sql_route() -> None:
     assert result.python_info is None
     assert result.ts_result is None
     assert len(result.sql_info.queries) == 1
-
-
-def test_dispatch_parser_treesitter_route_is_safe() -> None:
-    source_file = SourceFile(
-        path=Path("sample.js"),
-        language="javascript",
-        content="function hello() { return 1; }",
-        relative_path="sample.js",
-    )
-
-    result = dispatch_parser(source_file)
-
-    assert result.python_info is None
-    assert result.sql_info is None
-    assert result.ts_result is None or result.ts_result.language == "javascript"

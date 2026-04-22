@@ -122,65 +122,10 @@ def _parse_python(tree, source_bytes: bytes, source_file: str) -> list[ParsedUni
     return units
 
 
-def _parse_javascript(tree, source_bytes: bytes, source_file: str) -> list[ParsedUnit]:
-    """Parser JS/TS é extrait les fonctions et classes."""
-    units = []
-    root = tree.root_node
-
-    FUNCTION_TYPES = {
-        "function_declaration",
-        "function",
-        "arrow_function",
-        "method_definition",
-    }
-
-    def visit(node, parent_class: Optional[str] = None):
-        if node.type in FUNCTION_TYPES:
-            name_node = node.child_by_field_name("name")
-            name = (
-                _get_node_text(name_node, source_bytes) if name_node else "<anonymous>"
-            )
-            units.append(
-                ParsedUnit(
-                    unit_type="method" if parent_class else "function",
-                    name=name,
-                    language="javascript",
-                    start_line=node.start_point[0] + 1,
-                    end_line=node.end_point[0] + 1,
-                    source=_get_node_text(node, source_bytes),
-                    parent_name=parent_class,
-                )
-            )
-
-        elif node.type == "class_declaration":
-            name_node = node.child_by_field_name("name")
-            name = _get_node_text(name_node, source_bytes) if name_node else "unknown"
-            units.append(
-                ParsedUnit(
-                    unit_type="class",
-                    name=name,
-                    language="javascript",
-                    start_line=node.start_point[0] + 1,
-                    end_line=node.end_point[0] + 1,
-                    source=_get_node_text(node, source_bytes),
-                )
-            )
-            for child in node.children:
-                visit(child, parent_class=name)
-            return
-
-        for child in node.children:
-            visit(child, parent_class)
-
-    visit(root)
-    return units
-
-
 # Mapping langage -> fonction de parsing spécialisée
 LANGUAGE_PARSERS = {
     "python": _parse_python,
-    "javascript": _parse_javascript,
-    "typescript": _parse_javascript,  # la grammaire TS est quasi identique
+    # "sql": _parse_sql,  # TODO: ajouter un parseur tree-sitter SQL si besoin
 }
 
 
