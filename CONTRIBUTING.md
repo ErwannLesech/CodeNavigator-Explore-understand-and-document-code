@@ -10,7 +10,7 @@ CodeNavigator est un outil d'exploration de code, de génération de documentati
 
 1. Lisez le [README](README.md) pour comprendre les fonctionnalités, les prérequis et les commandes principales.
 2. Vérifiez qu'aucune issue ou discussion existante ne couvre déjà le sujet.
-3. Travaillez sur une branche dédiée créée à partir de `main`.
+3. Travaillez sur une branche dédiée créée à partir de `dev`.
 
 ## Nommage et conventions de travail
 
@@ -117,8 +117,6 @@ Quand vous ajoutez une fonctionnalité, visez au moins un cas nominal et un cas 
 ## Sécurité et secrets
 
 Ne commitez jamais de secrets, clés API ou données sensibles. Si une contribution nécessite une nouvelle configuration, documentez-la dans le README ou dans les fichiers de configuration appropriés.
-
-## Questions
 
 ## Questions et support
 
