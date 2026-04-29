@@ -314,8 +314,6 @@ def parse_sql_file(source: str, file_path: str, dialect: str = "ansi") -> SqlFil
             ):
                 queries.append(_parse_query(stmt))
         except Exception as exc:
-            # Some dialect-specific properties can be represented with unsupported
-            # AST arg shapes (for example list-valued expressions). Skip statement.
             logger.warning(
                 "Skipping unsupported SQL statement while parsing %s: %s",
                 file_path,

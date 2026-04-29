@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Iterator
-import re
 
 from git import Repo
 
@@ -34,9 +33,6 @@ def _normalize_git_url(value: str) -> str:
     # If a URL was accidentally wrapped in Path on Windows, backslashes can appear.
     if normalized.startswith(("http:/", "https:/")):
         normalized = normalized.replace("\\", "/")
-
-    # Repair single-slash scheme forms like https:/github.com/... into https://github.com/...
-    normalized = re.sub(r"^(https?):/(?!/)", r"\1://", normalized)
 
     return normalized
 
