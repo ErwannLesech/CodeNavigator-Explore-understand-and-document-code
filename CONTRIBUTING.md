@@ -6,6 +6,17 @@ Merci de votre intérêt pour CodeNavigator. Ce document décrit la façon de co
 
 CodeNavigator est un outil d'exploration de code, de génération de documentation et de RAG. Les contributions sont les bienvenues tant qu'elles restent cohérentes avec l'architecture existante, la lisibilité du code et la maintenabilité du projet.
 
+## Table des matières
+
+- [Avant de commencer](#avant-de-commencer)
+- [Nommage et conventions de travail](#nommage-et-conventions-de-travail)
+  - [Branches](#branches)
+  - [Issues](#issues)
+  - [Commits](#commits)
+- [Vérifications avant de proposer une contribution](#vérifications-avant-de-proposer-une-contribution)
+- [Conventions de code](#conventions-de-code)
+- [Tests](#tests)
+
 ## Avant de commencer
 
 1. Lisez le [README](README.md) pour comprendre les fonctionnalités, les prérequis et les commandes principales.
@@ -21,6 +32,13 @@ Pour garder un historique lisible et faciliter les revues, merci de suivre ces c
 - Préférez des noms explicites et courts, par exemple `feat/add-docs-export`, `fix/chat-reset`, `docs/contributing-update`.
 - Évitez les noms vagues comme `patch`, `update` ou `test`.
 - Si possible, rattachez le nom de la branche au sujet de l'issue.
+- Créez toujours votre branche à partir de `dev` :
+
+```bash
+git checkout dev
+git pull origin dev
+git checkout -b feat/my-feature dev
+```
 
 ### Issues
 
