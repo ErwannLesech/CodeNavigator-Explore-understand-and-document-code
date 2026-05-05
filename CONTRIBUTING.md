@@ -32,7 +32,7 @@ Pour garder un historique lisible et faciliter les revues, merci de suivre ces c
 - Préférez des noms explicites et courts, par exemple `feat/add-docs-export`, `fix/chat-reset`, `docs/contributing-update`.
 - Évitez les noms vagues comme `patch`, `update` ou `test`.
 - Si possible, rattachez le nom de la branche au sujet de l'issue.
-- Créez toujours votre branche à partir de `dev` :
+- Créez toujours votre branche à partir de `dev` en suivant la convention de nommage `<type>/<short-description>#<issueID>` (par exemple `feat/add-login#7`, `docs/update-readme#15`). Cela s'aligne avec Conventional Commits et améliore la cohérence du projet.
 
 ```bash
 git checkout dev
