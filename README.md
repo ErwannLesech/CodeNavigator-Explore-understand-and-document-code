@@ -223,10 +223,8 @@ If your contribution adds heavy dependencies or external services, document why 
 
 We review PRs quickly and are happy to help improve your changes — feel free to ask for guidance on an issue before implementation.
 
+For full contribution guidelines, conventions, branch naming, testing and PR checklist, see the repository CONTRIBUTING guide: [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 This project is licensed under the terms in the `LICENSE` file.
-
----
-
-If you'd like, I can also add a `CONTRIBUTING.md` and a PR template. Want me to add those now?
