@@ -8,79 +8,71 @@
 [![Tree-sitter](https://img.shields.io/badge/Parser-Tree--sitter-3C873A)](https://tree-sitter.github.io/tree-sitter/)
 [![SQLGlot](https://img.shields.io/badge/SQL-SQLGlot-4B5563)](https://github.com/tobymao/sqlglot)
 
-CodeNavigator est un outil d'exploration de code qui automatise:
+CodeNavigator is an open-source toolkit to explore, document and interact with codebases using structural parsing, knowledge graphs and RAG-powered chat.
 
-- l'ingestion d'un depot (Python, SQL, JS, TS),
-- le parsing structurel (fonctions, classes, schemas SQL, dependances),
-- la generation de documentation Markdown assistee par IA,
-- la construction d'un graphe de connaissances,
-- un chatbot RAG pour interroger la codebase en langage naturel.
+Key capabilities:
 
-## Fonctionnalites
+- Ingest repositories (local or remote) for Python, SQL, JS, TS and more.
+- Perform structural parsing (functions, classes, SQL schemas, cross-file dependencies).
+- Generate Markdown documentation assisted by LLMs.
+- Build and export knowledge graphs (JSON & Mermaid).
+- Provide a RAG chatbot over the codebase via CLI or HTTP API.
 
-- Ingestion de depot local ou distant (via clone Git).
-- Parsing specialise Python et SQL + fallback Tree-sitter.
-- Chunking et indexation vectorielle pour la recherche semantique.
-- Generation de docs projet/modules/fichiers au format Markdown.
-- Export de graphes en JSON.
-- Chat RAG en CLI et endpoint FastAPI reutilisable.
+**Table of Contents**
 
-## Structure du projet
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [CLI Usage](#cli-usage)
+- [Examples](#examples)
+- [API: Chat Endpoint](#api-chat-endpoint)
+- [Tests](#tests)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Features
+
+- Local or remote repository ingestion (Git clone supported).
+- Specialized Python and SQL parsing with Tree-sitter fallback.
+- Chunking and vector indexing for semantic search (Qdrant).
+- Documentation generation for project/module/file levels in Markdown.
+- Knowledge graph export in JSON (and visualizable via Mermaid).
+- RAG-enabled chat available both in CLI and via FastAPI endpoints.
+
+## Project Structure
 
 ```text
-CodeNavigator/
-|- backend/
-|  `- chat.py
-|- src/
-|  |- embedding/
-|  |  |- chunker.py
-|  |  |- embedder.py
-|  |  |- indexer.py
-|  |  `- vector_store.py
-|  |- generation/
-|  |  |- assembler.py
-|  |  |- doc_generator.py
-|  |  |- exporter.py
-|  |  `- prompts.py
-|  |- graph/
-|  |  |- builder.py
-|  |  |- json_exporter.py
-|  |  `- models.py
-|  |- ingestion/
-|  |  |- parser_dispatcher.py
-|  |  |- python_parser.py
-|  |  |- repo_walker.py
-|  |  |- sql_parser.py
-|  |  `- treesitter_parser.py
-|  |- rag/
-|  |  |- chatbot.py
-|  |  |- cli.py
-|  |  |- graph_context.py
-|  |  `- retriever.py
-|  `- main.py
-|- frontend/
-|- tests/
-|  `- ingestion/
-|- data/
-|  |- input/
-|  `- output/
-`- requirements.txt
+CodeNavigator-Explore-understand-and-document-code/
+├─ backend/                # FastAPI server and route handlers
+├─ frontend/               # Web client (Vite + React)
+├─ src/                    # Core processing code
+│  ├─ embedding/           # chunker, embedder, indexer, vector store
+│  ├─ generation/          # doc generation and exporter
+│  ├─ graph/               # graph builder & exporters
+│  ├─ ingestion/           # parsers and repo walker
+│  ├─ rag/                 # chatbot, retriever, CLI
+│  └─ main.py              # CLI entrypoint
+├─ data/                   # sample inputs and output artifacts
+├─ tests/                  # pytest suite
+└─ requirements.txt
 ```
 
-## Prerequis
+## Prerequisites
 
 - Python 3.11+
 - pip
-- Cle API Mistral (obligatoire pour generation et chat)
-- Qdrant (obligatoire pour indexation vectorielle et RAG)
+- Mistral API key (required for generation and chat)
+- Qdrant (for vector index and RAG)
 
-Option recommande (Docker Compose) pour lancer Qdrant + backend + frontend:
+Docker Compose is recommended to start Qdrant, backend and frontend locally:
 
 ```bash
 docker-compose up --build
 ```
 
-Services exposes:
+Services (defaults):
 
 - Frontend: http://localhost:5173
 - Backend: http://localhost:8001
@@ -88,14 +80,14 @@ Services exposes:
 
 ## Installation
 
-1. Cloner le depot
+1. Clone the repository
 
 ```bash
-git clone <url-du-repo>
+git clone <repo-url>
 cd CodeNavigator-Explore-understand-and-document-code
 ```
 
-2. Creer et activer un environnement virtuel
+2. Create and activate a virtual environment
 
 Windows (PowerShell):
 
@@ -111,13 +103,13 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-3. Installer les dependances
+3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Installer Qdrant client (necessaire a l'indexation)
+4. (Optional) Install the Qdrant client
 
 ```bash
 pip install qdrant-client==1.9.1
@@ -125,62 +117,62 @@ pip install qdrant-client==1.9.1
 
 ## Configuration
 
-Creer un fichier .env a la racine:
+Create a `.env` file at the repository root with at least:
 
 ```env
 MISTRAL_API_KEY=your_mistral_api_key
 GRAPH_JSON_PATH=data/output/graph/graph.json
 ```
 
-## Utilisation CLI
+## CLI Usage
 
-La CLI principale est dans src/main.py.
+The primary CLI entrypoint is `src/main.py`.
 
-### 1) Indexer une codebase
-
-```bash
-python -m src.main index --repo <path_ou_git_url>
-```
-
-Mode validation sans appels embeddings:
+Index a repository:
 
 ```bash
-python -m src.main index --repo <path_ou_git_url> --dry-run
+python -m src.main index --repo <path_or_git_url>
 ```
 
-### 2) Generer la documentation Markdown
+Dry-run (no embeddings / validation mode):
 
 ```bash
-python -m src.main generate --repo <path_ou_git_url> --output data/output/docs
+python -m src.main index --repo <path_or_git_url> --dry-run
 ```
 
-### 3) Generer le knowledge graph
+Generate Markdown documentation:
 
 ```bash
-python -m src.main graph --repo <path_ou_git_url> --output data/output/graph
+python -m src.main generate --repo <path_or_git_url> --output data/output/docs
 ```
 
-### 4) Lancer le pipeline complet
+Export the knowledge graph:
 
 ```bash
-python -m src.main full --repo <path_ou_git_url> --output data/output/docs
+python -m src.main graph --repo <path_or_git_url> --output data/output/graph
 ```
 
-### 5) Lancer le chatbot RAG en CLI
+Full pipeline (index + docs + graph):
+
+```bash
+python -m src.main full --repo <path_or_git_url> --output data/output/docs
+```
+
+Start the CLI chatbot (RAG):
 
 ```bash
 python -m src.main chat --graph data/output/graph/graph.json
 ```
 
-Commandes utiles dans le chat:
+Useful chat commands inside the CLI:
 
-- /sources : activer/desactiver l'affichage des sources
-- /reset : vider l'historique
-- /quit : quitter
+- `/sources` — toggle source display
+- `/reset` — clear conversation history
+- `/quit` — exit
 
-## Exemples rapides
+## Examples
 
-Utiliser le repo d'exemple fourni:
+Use the provided sample repository:
 
 ```bash
 python -m src.main graph --repo data/input/sample_repo --output data/output/graph
@@ -188,11 +180,11 @@ python -m src.main generate --repo data/input/sample_repo --output data/output/d
 python -m src.main chat --graph data/output/graph/graph.json
 ```
 
-## Endpoint API Chat (FastAPI)
+## API: Chat Endpoint (FastAPI)
 
-Le routeur est defini dans backend/chat.py (prefixe /api/chat).
+The chat router lives in `backend/chat.py` (prefixed at `/api/chat`).
 
-Exemple d'integration:
+Example integration:
 
 ```python
 from fastapi import FastAPI
@@ -202,15 +194,39 @@ app = FastAPI(title="CodeNavigator API")
 app.include_router(chat_router)
 ```
 
-Endpoints exposes:
+Exposed endpoints:
 
-- POST /api/chat
-- DELETE /api/chat/reset
+- `POST /api/chat` — send a chat request
+- `DELETE /api/chat/reset` — reset the chat session
 
 ## Tests
 
-Executer la suite de tests:
+Run the test suite with:
 
 ```bash
 pytest -q
 ```
+
+## Contributing
+
+Thank you for considering contributing! We welcome contributions of all kinds: bug reports, fixes, tests, documentation improvements, and new features.
+
+Please follow these guidelines to make contributing straightforward:
+
+1. Fork the repository and create a branch for your change: `git checkout -b feat/your-feature`.
+2. Follow the project conventions: Python 3.11, type hints, Pydantic models for schemas, and `logging` (no `print`).
+3. Add or update tests where appropriate and run `pytest` locally.
+4. Keep commits focused and follow Conventional Commits (e.g., `feat(...)`, `fix(...)`, `chore(...)`).
+5. Open a pull request describing the change, why it's needed, and any migration or runtime impacts.
+
+If your contribution adds heavy dependencies or external services, document why they are needed and how to configure them in the README.
+
+We review PRs quickly and are happy to help improve your changes — feel free to ask for guidance on an issue before implementation.
+
+## License
+
+This project is licensed under the terms in the `LICENSE` file.
+
+---
+
+If you'd like, I can also add a `CONTRIBUTING.md` and a PR template. Want me to add those now?
