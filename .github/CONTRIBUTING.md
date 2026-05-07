@@ -20,8 +20,9 @@ CodeNavigator is a code exploration, documentation generation, and RAG tool. Con
 ## Before You Start
 
 1. Read the [README](README.md) to understand the features, prerequisites, and main commands.
-2. Check that no existing issue or discussion already covers the topic.
-3. Work on a dedicated branch created from `dev`.
+2. Review and agree to uphold our [Code of Conduct](CODE_OF_CONDUCT.md). We maintain a respectful and inclusive community.
+3. Check that no existing issue or discussion already covers the topic.
+4. Work on a dedicated branch created from `dev`.
 
 ## Naming and Working Conventions
 
