@@ -84,6 +84,50 @@ FROM dv.link_booking__guest__res_package;
     assert any(t.name == "link_booking__guest__res_package" for t in query.tables_read)
 
 
+def test_parse_sql_file_extracts_ctas_columns() -> None:
+    """Test that CREATE TABLE AS SELECT extracts column definitions from the SELECT."""
+    sql = """
+CREATE TABLE IF NOT EXISTS silver.bv_current_customer AS
+WITH last_sat AS (
+    SELECT
+        s.hk_customer,
+        s.customer_name,
+        s.load_dts
+    FROM bronze.sat_customer_profile s
+)
+SELECT
+    h.hk_customer,
+    h.bk_customer_id,
+    l.customer_name,
+    l.load_dts AS effective_dts
+FROM bronze.hub_customer h
+LEFT JOIN last_sat l
+    ON h.hk_customer = l.hk_customer;
+"""
+
+    result = parse_sql_file(
+        source=sql, file_path="ctas_with_cte.sql", dialect="postgres"
+    )
+
+    # Verify schema is extracted with columns
+    assert len(result.schemas) == 1
+    schema = result.schemas[0]
+    assert schema.name == "bv_current_customer"
+
+    # Verify all columns from the SELECT are extracted
+    column_names = [col["name"] for col in schema.columns]
+    assert "hk_customer" in column_names
+    assert "bk_customer_id" in column_names
+    assert "customer_name" in column_names
+    assert "effective_dts" in column_names
+
+    # Verify column types are unknown (expected for CTAS)
+    for col in schema.columns:
+        assert col["type"] == "UNKNOWN"
+        assert col["nullable"] is True  # CTAS columns are typically nullable
+        assert col["primary_key"] is False
+
+
 def test_parse_sql_file_falls_back_when_dialect_mismatches() -> None:
     sql = """
 CREATE TEMP TABLE tmp_latest_addon
