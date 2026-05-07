@@ -87,7 +87,11 @@ def _safe_stmt_sql(stmt: exp.Expression) -> str:
 
 
 def _parse_create_table(stmt) -> Optional[TableSchema]:
-    """Extrait le schema d'un CREATE TABLE."""
+    """Extrait le schema d'un CREATE TABLE.
+    Gère deux cas:
+    1. CREATE TABLE (...colonnes_explicites...)
+    2. CREATE TABLE ... AS SELECT ... (colonnes implicites du SELECT)
+    """
     table_name = stmt.find(exp.Table)
     if not table_name:
         return None
@@ -96,6 +100,7 @@ def _parse_create_table(stmt) -> Optional[TableSchema]:
     primary_keys = []
     foreign_keys = []
 
+    # Cas 1: colonnes explicites (CREATE TABLE ... (...))
     for col_def in stmt.find_all(exp.ColumnDef):
         col_name = col_def.name
         col_type = col_def.args.get("kind")
@@ -134,6 +139,25 @@ def _parse_create_table(stmt) -> Optional[TableSchema]:
                         "column": fc,
                         "references_table": ref_table.name if ref_table else "unknown",
                         "references_column": rc,
+                    }
+                )
+
+    # Cas 2: colonnes implicites du SELECT (CREATE TABLE ... AS SELECT ...)
+    # Si pas de colonnes explicites, chercher l'expression SELECT
+    if not columns:
+        expression = stmt.args.get("expression")
+        if isinstance(expression, exp.Select):
+            # Extraire les colonnes du SELECT
+            for select_col in expression.expressions:
+                col_name = select_col.alias or (
+                    select_col.name if hasattr(select_col, "name") else str(select_col)
+                )
+                columns.append(
+                    {
+                        "name": col_name,
+                        "type": "UNKNOWN",
+                        "nullable": True,
+                        "primary_key": False,
                     }
                 )
 
