@@ -1,38 +1,38 @@
-# Contribuer à CodeNavigator
+# Contributing to CodeNavigator
 
-Merci de votre intérêt pour CodeNavigator. Ce document décrit la façon de contribuer au projet dans un cadre open source, avec un niveau d'exigence adapté à une utilisation par les équipes de Talan.
+Thank you for your interest in CodeNavigator. This document explains how to contribute to the project in an open-source setting, with expectations suited to use by Talan teams.
 
-## Objectif
+## Purpose
 
-CodeNavigator est un outil d'exploration de code, de génération de documentation et de RAG. Les contributions sont les bienvenues tant qu'elles restent cohérentes avec l'architecture existante, la lisibilité du code et la maintenabilité du projet.
+CodeNavigator is a code exploration, documentation generation, and RAG tool. Contributions are welcome as long as they remain consistent with the existing architecture, code readability, and project maintainability.
 
-## Table des matières
+## Table of Contents
 
-- [Avant de commencer](#avant-de-commencer)
-- [Nommage et conventions de travail](#nommage-et-conventions-de-travail)
+- [Before You Start](#before-you-start)
+- [Naming and Working Conventions](#naming-and-working-conventions)
   - [Branches](#branches)
   - [Issues](#issues)
   - [Commits](#commits)
-- [Vérifications avant de proposer une contribution](#vérifications-avant-de-proposer-une-contribution)
-- [Conventions de code](#conventions-de-code)
+- [Checks Before Submitting a Contribution](#checks-before-submitting-a-contribution)
+- [Code Conventions](#code-conventions)
 - [Tests](#tests)
 
-## Avant de commencer
+## Before You Start
 
-1. Lisez le [README](README.md) pour comprendre les fonctionnalités, les prérequis et les commandes principales.
-2. Vérifiez qu'aucune issue ou discussion existante ne couvre déjà le sujet.
-3. Travaillez sur une branche dédiée créée à partir de `dev`.
+1. Read the [README](README.md) to understand the features, prerequisites, and main commands.
+2. Check that no existing issue or discussion already covers the topic.
+3. Work on a dedicated branch created from `dev`.
 
-## Nommage et conventions de travail
+## Naming and Working Conventions
 
-Pour garder un historique lisible et faciliter les revues, merci de suivre ces conventions.
+To keep the history readable and make reviews easier, please follow these conventions.
 
 ### Branches
 
-- Préférez des noms explicites et courts, par exemple `feat/add-docs-export`, `fix/chat-reset`, `docs/contributing-update`.
-- Évitez les noms vagues comme `patch`, `update` ou `test`.
-- Si possible, rattachez le nom de la branche au sujet de l'issue.
-- Créez toujours votre branche à partir de `dev` en suivant la convention de nommage `<type>/<short-description>#<issueID>` (par exemple `feat/add-login#7`, `docs/update-readme#15`). Cela s'aligne avec Conventional Commits et améliore la cohérence du projet.
+- Prefer short, explicit branch names such as `feat/add-docs-export`, `fix/chat-reset`, or `docs/contributing-update`.
+- Avoid vague names such as `patch`, `update`, or `test`.
+- If possible, tie the branch name to the issue topic.
+- Always create your branch from `dev` following the `<type>/<short-description>#<issueID>` naming convention, for example `feat/add-login#7` or `docs/update-readme#15`. This aligns with Conventional Commits and improves project consistency.
 
 ```bash
 git checkout dev
@@ -42,38 +42,38 @@ git checkout -b feat/my-feature dev
 
 ### Issues
 
-- Décrivez le besoin métier ou technique en une phrase claire.
-- Ajoutez le contexte, l'objectif attendu et, si utile, les étapes de reproduction.
-- Indiquez les critères d'acceptation quand le sujet n'est pas purement technique.
-- Donnez un titre court, orienté action, qui permet de comprendre le sujet en un coup d'œil.
+- Describe the business or technical need in one clear sentence.
+- Add context, the expected outcome, and, if useful, reproduction steps.
+- Provide acceptance criteria when the topic is not purely technical.
+- Use a short, action-oriented title that makes the topic easy to understand at a glance.
 
 ### Commits
 
-Ce dépôt suit la convention de commits de type Conventional Commits.
+This repository follows the Conventional Commits convention.
 
-Format recommandé :
+Recommended format:
 
 ```text
 <type>(<scope>): <short description>
 ```
 
-Types courants : `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `style`, `perf`, `ci`.
+Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `style`, `perf`, `ci`.
 
-Exemples :
+Examples:
 
 - `feat(graph): add module dependency export`
 - `fix(chat): handle empty conversation history`
 - `docs(contributing): add contribution rules`
 
-Gardez les messages courts, précis et cohérents avec le contenu réel du commit.
+Keep commit messages short, precise, and consistent with the actual content of the commit.
 
-## Vérifications avant de proposer une contribution
+## Checks Before Submitting a Contribution
 
-Avant d'ouvrir une pull request, exécutez au minimum les vérifications pertinentes pour votre changement.
+Before opening a pull request, run at least the checks relevant to your change.
 
-### Tests Python
+### Python Tests
 
-Dans cet espace de travail, la commande de référence est :
+In this workspace, the reference command is:
 
 ```powershell
 CodeNavigator-Explore-understand-and-document-code/.venv/Scripts/python.exe -m pytest -q
@@ -81,71 +81,71 @@ CodeNavigator-Explore-understand-and-document-code/.venv/Scripts/python.exe -m p
 
 ### Frontend
 
-Si votre changement touche l'interface ou les composants React, lancez les tests et la vérification TypeScript du frontend selon les scripts définis dans `frontend/package.json`.
+If your change affects the UI or React components, run the frontend tests and TypeScript checks according to the scripts defined in `frontend/package.json`.
 
-### Qualité
+### Quality
 
-- Vérifiez que le code reste cohérent avec le style du projet.
-- Gardez les changements ciblés et limités au besoin fonctionnel.
-- Ajoutez ou mettez à jour les tests quand le comportement change.
+- Make sure the code remains consistent with the project style.
+- Keep changes focused and limited to the functional need.
+- Add or update tests when behavior changes.
 
-## Conventions de code
+## Code Conventions
 
 ### Python
 
-- Utilisez `snake_case` pour les fonctions et variables.
-- Utilisez `PascalCase` pour les classes et modèles Pydantic.
-- Ajoutez des annotations de type sur les signatures publiques.
-- Préférez `logging` à `print()`.
-- Gardez les routes FastAPI explicites avec `response_model` et `status_code`.
-- Ne retournez pas de dictionnaires bruts si un modèle existe.
+- Use `snake_case` for functions and variables.
+- Use `PascalCase` for classes and Pydantic models.
+- Add type annotations to public signatures.
+- Prefer `logging` over `print()`.
+- Keep FastAPI routes explicit with `response_model` and `status_code`.
+- Do not return raw dictionaries when a model exists.
 
 ### React / TypeScript
 
-- Utilisez des composants fonctionnels.
-- Préférez les exports nommés sauf pour les pages.
-- Évitez `any` sans justification claire.
-- Suivez la structure existante du dossier `frontend/src`.
+- Use functional components.
+- Prefer named exports except for pages.
+- Avoid `any` without a clear justification.
+- Follow the existing structure of `frontend/src`.
 
 ## Tests
 
-Le projet suit une logique de tests proche du module modifié.
+The project follows a test approach close to the modified module.
 
-- Backend Python : `pytest`
-- API FastAPI : tests d'intégration avec `httpx` et `AsyncClient`
-- Frontend : `@testing-library/react`
+- Backend Python: `pytest`
+- FastAPI API: integration tests with `httpx` and `AsyncClient`
+- Frontend: `@testing-library/react`
 
-Quand vous ajoutez une fonctionnalité, visez au moins un cas nominal et un cas d'erreur quand cela a du sens.
+When you add a feature, aim for at least one happy path and one error case when it makes sense.
 
-## Flux de contribution
+## Contribution Flow
 
-1. Ouvrez une issue ou décrivez clairement le besoin avant de coder si le changement est important.
-2. Implémentez la modification sur une branche dédiée.
-3. Ajoutez ou mettez à jour les tests.
-4. Vérifiez le résultat localement.
-5. Ouvrez une pull request avec une description claire du problème, de la solution et des validations réalisées.
+1. Open an issue or clearly describe the need before coding if the change is significant.
+2. Implement the change on a dedicated branch.
+3. Add or update the tests.
+4. Verify the result locally.
+5. Open a pull request with a clear description of the problem, the solution, and the validations performed.
 
-## Bonnes pratiques pour les pull requests
+## Pull Request Best Practices
 
-- Une PR doit idéalement couvrir un seul sujet.
-- Décrivez le contexte métier si le changement touche l'exploration de code, la génération ou le RAG.
-- Indiquez les commandes de test exécutées.
-- Joignez des captures ou extraits de sortie si l'UI ou les docs changent.
+- A PR should ideally cover a single topic.
+- Describe the business context if the change touches code exploration, generation, or RAG.
+- List the test commands you ran.
+- Include screenshots or output excerpts if the UI or docs change.
 
-## Sécurité et secrets
+## Security and Secrets
 
-Ne commitez jamais de secrets, clés API ou données sensibles. Si une contribution nécessite une nouvelle configuration, documentez-la dans le README ou dans les fichiers de configuration appropriés.
+Never commit secrets, API keys, or sensitive data. If a contribution requires a new configuration, document it in the README or in the appropriate configuration files.
 
-## Questions et support
+## Questions and Support
 
-Si vous contribuez au nom d'une équipe Talan, mentionnez le contexte d'usage dans la pull request afin de faciliter la revue et la priorisation.
+If you are contributing on behalf of a Talan team, mention the usage context in the pull request to help with review and prioritization.
 
-Pour une question, précisez si possible :
+For a question, please specify as much as possible:
 
-- le contexte fonctionnel ou métier,
-- le fichier ou le module concerné,
-- ce qui a déjà été tenté,
-- la sortie d'erreur ou le comportement observé,
-- si la question concerne l'architecture, le packaging, les tests ou le déploiement.
+- the functional or business context,
+- the file or module involved,
+- what has already been tried,
+- the error output or observed behavior,
+- whether the question concerns architecture, packaging, tests, or deployment.
 
-Plus la question est précise, plus il est facile de vous répondre rapidement et utilement.
+The more precise the question, the easier it is to answer quickly and usefully.
