@@ -43,6 +43,11 @@ def _format_function(
     if func.docstring:
         lines.append(f"Docstring: {func.docstring}")
 
+    # Add the source code
+    if func.source_code:
+        lines.append("\nSource code:")
+        lines.append(func.source_code)
+
     return Chunk(
         chunk_id=_build_id(file_path, parent, func.name),
         content="\n".join(lines),
@@ -50,6 +55,7 @@ def _format_function(
         language="python",
         source_file=file_path,
         start_line=func.lineno,
+        end_line=func.end_lineno,
         metadata={
             "name": func.name,
             "parent_class": parent,
@@ -99,8 +105,11 @@ def _format_table_schema(schema: TableSchema, file_path: str) -> Chunk:
         for fk in schema.foreign_keys
     ]
 
+    # Build fully qualified table name (schema.table_name)
+    full_table_name = f"{schema.schema}.{schema.name}" if schema.schema else schema.name
+
     lines = [
-        f"SQL Table: {schema.name}",
+        f"SQL Table: {full_table_name}",
         f"File: {file_path}",
         "Columns:",
         *col_lines,
@@ -110,7 +119,7 @@ def _format_table_schema(schema: TableSchema, file_path: str) -> Chunk:
         lines.extend(fk_lines)
 
     return Chunk(
-        chunk_id=_build_id(file_path, schema.name),
+        chunk_id=_build_id(file_path, full_table_name),
         content="\n".join(lines),
         chunk_type="table_schema",
         language="sql",
@@ -118,6 +127,8 @@ def _format_table_schema(schema: TableSchema, file_path: str) -> Chunk:
         start_line=schema.lineno,
         metadata={
             "table_name": schema.name,
+            "schema": schema.schema,
+            "full_qualified_name": full_table_name,
             "column_count": len(schema.columns),
             "has_foreign_keys": len(schema.foreign_keys) > 0,
             "primary_keys": schema.primary_keys,

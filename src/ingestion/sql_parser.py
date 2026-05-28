@@ -2,6 +2,7 @@
 import sqlglot
 import sqlglot.expressions as exp
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 
@@ -44,6 +45,7 @@ class TableSchema:
     foreign_keys: list[
         dict
     ]  # {"column": str, "references_table": str, "references_column": str}
+    schema: Optional[str] = None  # schema prefix (fact, dim, silver, etc.)
     lineno: Optional[int] = None
 
 
@@ -86,7 +88,7 @@ def _safe_stmt_sql(stmt: exp.Expression) -> str:
         return repr(stmt)
 
 
-def _parse_create_table(stmt) -> Optional[TableSchema]:
+def _parse_create_table(stmt, lineno: Optional[int] = None) -> Optional[TableSchema]:
     """Extrait le schema d'un CREATE TABLE.
     Gère deux cas:
     1. CREATE TABLE (...colonnes_explicites...)
@@ -106,14 +108,10 @@ def _parse_create_table(stmt) -> Optional[TableSchema]:
         col_type = col_def.args.get("kind")
         col_type_str = col_type.sql() if col_type else "UNKNOWN"
 
-        is_pk = any(
-            isinstance(c, exp.PrimaryKeyColumnConstraint)
-            for c in col_def.find_all(exp.ColumnConstraint)
-        )
-        not_null = any(
-            isinstance(c, exp.NotNullColumnConstraint)
-            for c in col_def.find_all(exp.ColumnConstraint)
-        )
+        # Check for PRIMARY KEY constraint on the column
+        is_pk = bool(col_def.find(exp.PrimaryKeyColumnConstraint))
+        not_null = bool(col_def.find(exp.NotNullColumnConstraint))
+
         if is_pk:
             primary_keys.append(col_name)
 
@@ -125,6 +123,19 @@ def _parse_create_table(stmt) -> Optional[TableSchema]:
                 "primary_key": is_pk,
             }
         )
+
+    # Détécter les clés primaires déclarées comme table constraints
+    # PRIMARY KEY (col1, col2, ...)
+    for pk_constraint in stmt.find_all(exp.PrimaryKey):
+        for col in pk_constraint.find_all(exp.Column):
+            col_name = col.name
+            if col_name and col_name not in primary_keys:
+                primary_keys.append(col_name)
+                # Mark the column as PK in the columns list
+                for c in columns:
+                    if c["name"] == col_name:
+                        c["primary_key"] = True
+                        c["nullable"] = False
 
     # Clés étrangéres déclarées en contrainte de table
     for fk in stmt.find_all(exp.ForeignKey):
@@ -166,6 +177,8 @@ def _parse_create_table(stmt) -> Optional[TableSchema]:
         columns=columns,
         primary_keys=primary_keys,
         foreign_keys=foreign_keys,
+        schema=table_name.db or None,  # Capture schema prefix (fact, dim, etc.)
+        lineno=lineno,
     )
 
 
@@ -287,6 +300,47 @@ def _parse_query(stmt) -> QueryInfo:
     )
 
 
+def _find_create_table_positions(source: str) -> list[int]:
+    """Find all CREATE TABLE positions in source (line numbers, 1-indexed)."""
+    lines = source.split("\n")
+    positions = []
+
+    for i, line in enumerate(lines):
+        # Match CREATE TABLE or CREATE SCHEMA or CREATE INDEX
+        if re.search(
+            r"CREATE\s+(TABLE|SCHEMA|INDEX|UNIQUE\s+INDEX)", line, re.IGNORECASE
+        ):
+            positions.append(i + 1)  # 1-indexed
+
+    return positions
+
+
+def _map_statements_to_lines(
+    source: str, statements: list[exp.Expression | None]
+) -> dict[int, int]:
+    """Build a map from statement index to line number.
+    Use pre-calculated CREATE TABLE positions."""
+    create_positions = _find_create_table_positions(source)
+    stmt_to_line = {}
+    create_idx = 0
+
+    for stmt_idx, stmt in enumerate(statements):
+        if stmt is None:
+            continue
+
+        # For CREATE TABLE statements, use the pre-calculated positions
+        if isinstance(stmt, exp.Create) and stmt.find(exp.Table):
+            if create_idx < len(create_positions):
+                stmt_to_line[stmt_idx] = create_positions[create_idx]
+                create_idx += 1
+            else:
+                stmt_to_line[stmt_idx] = None
+        else:
+            stmt_to_line[stmt_idx] = None
+
+    return stmt_to_line
+
+
 def parse_sql_file(source: str, file_path: str, dialect: str = "ansi") -> SqlFileInfo:
     """
     Parse un fichier SQL complet.
@@ -321,13 +375,22 @@ def parse_sql_file(source: str, file_path: str, dialect: str = "ansi") -> SqlFil
         # En cas d'erreur fatale, on retourne un résultat vide plutét que de crasher
         return SqlFileInfo(schemas=[], queries=[], source_file=file_path)
 
-    for stmt in statements:
+    # Build mapping from statement index to line number
+    stmt_to_line = _map_statements_to_lines(source, statements)
+
+    for stmt_idx, stmt in enumerate(statements):
         if stmt is None:
             continue
         try:
+            lineno = stmt_to_line.get(stmt_idx)
             if isinstance(stmt, exp.Create) and stmt.find(exp.Table):
-                schema = _parse_create_table(stmt)
-                if schema:
+                schema = _parse_create_table(stmt, lineno=lineno)
+                # Only add schemas that have columns (filter out CREATE SCHEMA, CREATE INDEX, etc.)
+                if schema and (
+                    len(schema.columns) > 0
+                    or schema.primary_keys
+                    or schema.foreign_keys
+                ):
                     schemas.append(schema)
             if isinstance(
                 stmt, (exp.Select, exp.Insert, exp.Update, exp.Delete, exp.Merge)

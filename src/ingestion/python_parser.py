@@ -12,7 +12,9 @@ class FunctionInfo:
     args: list[str]
     decorators: list[str]
     lineno: int
+    end_lineno: Optional[int] = None  # Line where the function ends
     is_method: bool = False
+    source_code: Optional[str] = None  # Full source code of the function
 
 
 @dataclass
@@ -35,10 +37,25 @@ class ModuleInfo:
 
 def parse_python_file(source: str, module_name: str) -> ModuleInfo:
     tree = ast.parse(source)
+    lines = source.split("\n")
 
     imports: list[str] = []
     functions: list[FunctionInfo] = []
     classes: list[ClassInfo] = []
+
+    def _extract_source(lineno: int, end_lineno: Optional[int]) -> Optional[str]:
+        """Extract source code from line numbers (1-indexed)."""
+        if not lineno or not end_lineno:
+            return None
+        try:
+            # Convert 1-indexed to 0-indexed
+            start_idx = lineno - 1
+            end_idx = end_lineno  # end_lineno is inclusive
+            if start_idx < 0 or end_idx > len(lines):
+                return None
+            return "\n".join(lines[start_idx:end_idx])
+        except Exception:
+            return None
 
     for node in tree.body:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
@@ -52,6 +69,8 @@ def parse_python_file(source: str, module_name: str) -> ModuleInfo:
                 args=[arg.arg for arg in node.args.args],
                 decorators=[ast.unparse(d) for d in node.decorator_list],
                 lineno=node.lineno,
+                end_lineno=node.end_lineno,
+                source_code=_extract_source(node.lineno, node.end_lineno),
             )
             functions.append(func_info)
             continue
@@ -64,7 +83,9 @@ def parse_python_file(source: str, module_name: str) -> ModuleInfo:
                     args=[arg.arg for arg in member.args.args],
                     decorators=[ast.unparse(d) for d in member.decorator_list],
                     lineno=member.lineno,
+                    end_lineno=member.end_lineno,
                     is_method=True,
+                    source_code=_extract_source(member.lineno, member.end_lineno),
                 )
                 for member in node.body
                 if isinstance(member, ast.FunctionDef)
