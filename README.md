@@ -12,7 +12,7 @@ CodeNavigator is an open-source toolkit to explore, document and interact with c
 
 Key capabilities:
 
-- Ingest repositories (local or remote) for Python, SQL, JS, TS and more.
+- Ingest repositories (local or remote) for Python, SQL.
 - Perform structural parsing (functions, classes, SQL schemas, cross-file dependencies).
 - Generate Markdown documentation assisted by LLMs.
 - Build and export knowledge graphs (JSON & Mermaid).
@@ -30,6 +30,8 @@ Key capabilities:
 - [API: Chat Endpoint](#api-chat-endpoint)
 - [Tests](#tests)
 - [Contributing](#contributing)
+- [Code of Conduct](#code-of-conduct)
+- [Authors](#authors)
 - [License](#license)
 
 ## Features
@@ -224,6 +226,27 @@ If your contribution adds heavy dependencies or external services, document why 
 We review PRs quickly and are happy to help improve your changes — feel free to ask for guidance on an issue before implementation.
 
 For full contribution guidelines, conventions, branch naming, testing and PR checklist, see the repository CONTRIBUTING guide: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Code of Conduct
+
+We are committed to providing a welcoming and inspiring community for all participants. Please review and adhere to our [Code of Conduct](CODE_OF_CONDUCT.md) when engaging with this project.
+
+---
+
+## Authors
+
+**CodeNavigator** is developed by:
+
+- **Lesech Erwann** — Lead Developer
+  - Email: [lesech.erwann@gmail.com](mailto:lesech.erwann@gmail.com)
+
+In collaboration with **Talan**, with support from:
+
+- **Yann Valey** — Chief Innovation Officer, AI (Talan South-East)
+
+---
+
+For questions, feedback, or inquiries, please reach out to [lesech.erwann@gmail.com](mailto:lesech.erwann@gmail.com).
 
 ## License
 
