@@ -124,6 +124,8 @@ def test_parse_args_chat_options() -> None:
             "Chunks",
             "--top-k",
             "9",
+            "--model",
+            "mistral-small-latest",
         ],
     )
 
@@ -133,3 +135,12 @@ def test_parse_args_chat_options() -> None:
     assert args.qdrant_port == 7000
     assert args.qdrant_collection == "Chunks"
     assert args.top_k == 9
+    assert args.model == "mistral-small-latest"
+
+
+def test_parse_args_models_list() -> None:
+    """Verifie la commande models list."""
+    args = _parse_with_argv(["models", "list"])
+
+    assert args.command == "models"
+    assert args.models_command == "list"

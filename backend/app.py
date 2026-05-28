@@ -6,6 +6,7 @@ from backend.routes import (
     docs_router,
     graph_router,
     health_router,
+    models_router,
     pipeline_router,
     qdrant_router,
 )
@@ -26,6 +27,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(docs_router)
     app.include_router(graph_router)
+    app.include_router(models_router)
     app.include_router(pipeline_router)
     app.include_router(qdrant_router)
 

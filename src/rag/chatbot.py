@@ -1,12 +1,12 @@
 # rag/chatbot.py
-import os
 import time
 from dataclasses import dataclass
 from typing import Optional
-from mistralai import Mistral
-from src.rag.retriever import Retriever, RetrievedContext
-from src.rag.graph_context import GraphContextProvider
+
 from src.generation.prompts import RAG_SYSTEM_PROMPT, prompt_rag
+from src.rag.graph_context import GraphContextProvider
+from src.rag.providers import LLMProvider, ProviderChatResult, get_provider
+from src.rag.retriever import RetrievedContext, Retriever
 
 
 @dataclass
@@ -23,18 +23,30 @@ class ChatResponse:
     debug: dict
 
 
+@dataclass
+class PreparedChat:
+    provider: LLMProvider
+    messages: list[dict[str, str]]
+    query: str
+    contexts: list[RetrievedContext]
+    graph_context: str
+    user_prompt: str
+    started_at: float
+    vector_status: str
+    vector_error: str
+
+
 class CodeNavigatorChatbot:
     def __init__(
         self,
         graph_json_path: Optional[str] = None,
         top_k: int = 6,
-        model: str = "mistral-large-latest",
+        default_model: Optional[str] = None,
         qdrant_host: str = "localhost",
         qdrant_port: int = 6333,
         qdrant_collection: str = "CodeNavigatorChunks",
     ):
-        self.client = Mistral(api_key=os.environ["MISTRAL_API_KEY"])
-        self.model = model
+        self.default_model = default_model
         self.retriever = Retriever(
             top_k=top_k,
             qdrant_host=qdrant_host,
@@ -59,28 +71,30 @@ class CodeNavigatorChatbot:
             return None  # le graph est optionnel
 
     def _build_messages(self, user_prompt: str) -> list[dict[str, str]]:
-        """Construit l'historique de conversation pour l'API Mistral."""
+        """Construit l'historique de conversation pour le provider sélectionné."""
         messages = [{"role": "system", "content": RAG_SYSTEM_PROMPT}]
 
-        # Injecter l'historique (fenétre glissante de 6 derniers échanges)
         for msg in self.history[-6:]:
             messages.append({"role": msg.role, "content": msg.content})
 
         messages.append({"role": "user", "content": user_prompt})
         return messages
 
-    def chat(
+    def _select_provider(self, model: Optional[str] = None) -> LLMProvider:
+        return get_provider(model or self.default_model)
+
+    def _prepare_chat(
         self,
         query: str,
         filter_language: Optional[str] = None,
         filter_type: Optional[str] = None,
         filter_file: Optional[str] = None,
-    ) -> ChatResponse:
+        model: Optional[str] = None,
+    ) -> PreparedChat:
         started_at = time.perf_counter()
         vector_status = "ok"
         vector_error = ""
 
-        # 1. Retrieval
         try:
             contexts = self.retriever.retrieve(
                 query,
@@ -95,94 +109,117 @@ class CodeNavigatorChatbot:
 
         formatted_context = self.retriever.format_context(contexts) if contexts else ""
 
-        # 2. Graph context
         graph_context = ""
         if self.graph_provider and contexts:
             graph_context = self.graph_provider.get_context_for_chunks(contexts)
         elif self.graph_provider:
             graph_context = self.graph_provider.get_context_for_query(query)
 
-        # 3. Construction du prompt RAG
         user_prompt = prompt_rag(query, formatted_context, graph_context)
 
-        # 4. Appel LLM avec historique
-        messages = self._build_messages(user_prompt)
-        response = self.client.chat.complete(
-            model=self.model,
-            messages=messages,  # type: ignore[arg-type]
-            max_tokens=1500,
+        return PreparedChat(
+            provider=self._select_provider(model),
+            messages=self._build_messages(user_prompt),
+            query=query,
+            contexts=contexts,
+            graph_context=graph_context,
+            user_prompt=user_prompt,
+            started_at=started_at,
+            vector_status=vector_status,
+            vector_error=vector_error,
         )
-        if response is None or response.choices is None or not response.choices:
-            raise RuntimeError("LLM API returned an empty response")
 
-        content = response.choices[0].message.content
-        if isinstance(content, str):
-            answer = content
-        elif isinstance(content, list):
-            answer = "\n".join(getattr(item, "text", str(item)) for item in content)
-        elif content is None:
-            raise RuntimeError("LLM API returned empty content")
-        else:
-            answer = str(content)
-
-        # 5. Mise à jour de l'historique
-        # On stocke la question originale (pas le prompt enrichi) pour garder l'historique lisible
-        self.history.append(Message(role="user", content=query))
+    def _finalize_chat(
+        self,
+        prepared: PreparedChat,
+        answer: str,
+        result: ProviderChatResult | None = None,
+    ) -> ChatResponse:
+        self.history.append(Message(role="user", content=prepared.query))
         self.history.append(Message(role="assistant", content=answer))
-
-        usage = getattr(response, "usage", None)
-        prompt_tokens = getattr(usage, "prompt_tokens", None)
-        completion_tokens = getattr(usage, "completion_tokens", None)
-        total_tokens = getattr(usage, "total_tokens", None)
-
-        if prompt_tokens is None and usage is not None:
-            prompt_tokens = getattr(usage, "input_tokens", None)
-        if completion_tokens is None and usage is not None:
-            completion_tokens = getattr(usage, "output_tokens", None)
-        if (
-            total_tokens is None
-            and prompt_tokens is not None
-            and completion_tokens is not None
-        ):
-            total_tokens = prompt_tokens + completion_tokens
 
         debug_contexts = [
             {
-                "source_file": c.source_file,
-                "chunk_type": c.chunk_type,
-                "chunk_id": c.chunk_id,
-                "score": round(c.score, 3),
-                "content_excerpt": c.content[:800],
+                "source_file": context.source_file,
+                "chunk_type": context.chunk_type,
+                "chunk_id": context.chunk_id,
+                "score": round(context.score, 3),
+                "content_excerpt": context.content[:800],
             }
-            for c in contexts
+            for context in prepared.contexts
         ]
 
-        elapsed_ms = round((time.perf_counter() - started_at) * 1000, 1)
+        elapsed_ms = round((time.perf_counter() - prepared.started_at) * 1000, 1)
 
         return ChatResponse(
             answer=answer,
-            sources=contexts,
-            graph_context_used=bool(graph_context),
+            sources=prepared.contexts,
+            graph_context_used=bool(prepared.graph_context),
             debug={
-                "model": self.model,
+                "provider": prepared.provider.provider_name,
+                "model": prepared.provider.model_name,
                 "duration_ms": elapsed_ms,
                 "tokens": {
-                    "prompt": prompt_tokens,
-                    "completion": completion_tokens,
-                    "total": total_tokens,
+                    "prompt": result.prompt_tokens if result else None,
+                    "completion": result.completion_tokens if result else None,
+                    "total": result.total_tokens if result else None,
                 },
-                "vector_status": vector_status,
-                "vector_error": vector_error,
+                "vector_status": prepared.vector_status,
+                "vector_error": prepared.vector_error,
                 "vector_store": {
                     "host": self.qdrant_host,
                     "port": self.qdrant_port,
                     "collection": self.qdrant_collection,
                 },
                 "retrieval_context": debug_contexts,
-                "graph_context": graph_context[:4000] if graph_context else "",
-                "prompt_preview": user_prompt[:4000],
+                "graph_context": prepared.graph_context[:4000]
+                if prepared.graph_context
+                else "",
+                "prompt_preview": prepared.user_prompt[:4000],
             },
         )
+
+    def chat(
+        self,
+        query: str,
+        filter_language: Optional[str] = None,
+        filter_type: Optional[str] = None,
+        filter_file: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> ChatResponse:
+        prepared = self._prepare_chat(
+            query,
+            filter_language=filter_language,
+            filter_type=filter_type,
+            filter_file=filter_file,
+            model=model,
+        )
+        result = prepared.provider.chat(prepared.messages, max_tokens=1500)
+        return self._finalize_chat(prepared, result.answer, result)
+
+    def prepare_chat(
+        self,
+        query: str,
+        filter_language: Optional[str] = None,
+        filter_type: Optional[str] = None,
+        filter_file: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> PreparedChat:
+        return self._prepare_chat(
+            query,
+            filter_language=filter_language,
+            filter_type=filter_type,
+            filter_file=filter_file,
+            model=model,
+        )
+
+    def complete_chat(
+        self,
+        prepared: PreparedChat,
+        answer: str,
+        result: ProviderChatResult | None = None,
+    ) -> ChatResponse:
+        return self._finalize_chat(prepared, answer, result)
 
     def reset(self):
         self.history.clear()

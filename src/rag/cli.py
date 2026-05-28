@@ -2,8 +2,11 @@
 from rich import print
 from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.table import Table
 from typing import Optional
+
 from src.rag.chatbot import CodeNavigatorChatbot
+from src.rag.providers import list_available_models, resolve_default_model
 
 
 def run_chat_cli(
@@ -12,6 +15,7 @@ def run_chat_cli(
     qdrant_port: int = 6333,
     qdrant_collection: str = "CodeNavigatorChunks",
     top_k: int = 6,
+    model: Optional[str] = None,
 ):
     print(
         Panel.fit(
@@ -24,6 +28,7 @@ def run_chat_cli(
     bot = CodeNavigatorChatbot(
         graph_json_path=graph_json_path,
         top_k=top_k,
+        default_model=model,
         qdrant_host=qdrant_host,
         qdrant_port=qdrant_port,
         qdrant_collection=qdrant_collection,
@@ -52,7 +57,11 @@ def run_chat_cli(
             )
             continue
 
-        response = bot.chat(query)
+        try:
+            response = bot.chat(query)
+        except (RuntimeError, ValueError) as exc:
+            print(f"[bold red]Erreur:[/bold red] {exc}")
+            continue
 
         print(f"\n[bold blue]CodeNavigator[/bold blue]\n{response.answer}")
 
@@ -62,3 +71,29 @@ def run_chat_cli(
                 print(
                     f"  [dim][{i}] {src.source_file} ({src.chunk_type}) é score: {src.score:.3f}[/dim]"
                 )
+
+
+def run_models_list() -> None:
+    models = list_available_models()
+    if not models:
+        print("[dim]Aucun modèle n'est disponible pour le moment.[/dim]")
+        return
+
+    default_model = resolve_default_model(models)
+    table = Table(title="Modèles disponibles")
+    table.add_column("Type", style="dim", no_wrap=True)
+    table.add_column("Provider", style="bold")
+    table.add_column("Modèle")
+    table.add_column("Label")
+    table.add_column("Défaut", justify="center")
+
+    for model in models:
+        table.add_row(
+            "Cloud" if model.deployment == "cloud" else "Local",
+            model.provider,
+            model.id,
+            model.label,
+            "*" if model.id == default_model.id else "",
+        )
+
+    print(table)

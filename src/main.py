@@ -10,7 +10,7 @@ from src.ingestion.parser_dispatcher import dispatch_parser
 from src.graph.builder import GraphBuilder
 from src.graph.json_exporter import export_graph_json
 
-from src.rag.cli import run_chat_cli
+from src.rag.cli import run_chat_cli, run_models_list
 
 
 def build_chunks(args):
@@ -54,7 +54,15 @@ def run_chat(args):
         qdrant_port=args.qdrant_port,
         qdrant_collection=args.qdrant_collection,
         top_k=args.top_k,
+        model=args.model,
     )
+
+
+def run_models(args):
+    if args.models_command == "list":
+        run_models_list()
+        return
+    raise ValueError("Unknown models command. Available commands: list")
 
 
 def parse_args():
@@ -119,6 +127,16 @@ def parse_args():
     chat_cmd.add_argument("--qdrant-port", type=int, default=6333)
     chat_cmd.add_argument("--qdrant-collection", default="CodeNavigatorChunks")
     chat_cmd.add_argument("--top-k", type=int, default=6)
+    chat_cmd.add_argument(
+        "--model",
+        default=None,
+        help="Nom du modele LLM a utiliser pour la session de chat",
+    )
+
+    models_cmd = subparsers.add_parser("models", help="Lister les modeles disponibles")
+    models_subparsers = models_cmd.add_subparsers(dest="models_command")
+    models_subparsers.required = True
+    models_subparsers.add_parser("list", help="Afficher les modeles disponibles")
 
     return parser.parse_args()
 
@@ -151,9 +169,12 @@ def main():
     elif args.command == "chat":
         run_chat(args)
 
+    elif args.command == "models":
+        run_models(args)
+
     else:
         raise ValueError(
-            f"Unknown command: {args.command}. Available commands: index, generate, graph, full, chat"
+            f"Unknown command: {args.command}. Available commands: index, generate, graph, full, chat, models"
         )
 
 

@@ -96,3 +96,16 @@ class QdrantInfoResponse(BaseModel):
 class QdrantOpenResponse(BaseModel):
     status: str
     url: str
+
+
+class ChatModelOption(BaseModel):
+    provider: str
+    id: str
+    label: str
+    deployment: str
+
+
+class ChatModelsResponse(BaseModel):
+    default_provider: str
+    default_model: str
+    models: list[ChatModelOption]
