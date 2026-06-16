@@ -2,11 +2,7 @@ import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
-
-if __package__ in (None, ""):
-    repo_root = Path(__file__).resolve().parents[2]
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
+import logging
 
 from rag_evaluation.src.chatbot_runner import (
     case_to_dict,
@@ -19,6 +15,16 @@ from rag_evaluation.src.metrics import (
     case_metrics_to_dict,
     compute_case_metrics,
 )
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+if __package__ in (None, ""):
+    repo_root = Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
 
 
 def _build_output_path(output):
@@ -53,11 +59,14 @@ def run_evaluation(
     )
 
     cases = []
+    i = 0
     for item, run in zip(dataset, runs):
+        logger.info(f"Computing metrics for case: {i+1}/{len(dataset)}")
         metrics = compute_case_metrics(item, run)
         row = case_to_dict(run)
         row["metrics"] = case_metrics_to_dict(metrics)
         cases.append(row)
+        i += 1
 
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),

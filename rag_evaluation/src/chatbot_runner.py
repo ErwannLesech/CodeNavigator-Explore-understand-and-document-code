@@ -2,15 +2,22 @@ import json
 import time
 import sys
 from pathlib import Path
+import logging
+
+from src.rag.chatbot import CodeNavigatorChatbot
+
+from rag_evaluation.src.models import ChatbotRun, DatasetItem, RetrievedChunk
+
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 if __package__ in (None, ""):
     repo_root = Path(__file__).resolve().parents[2]
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
-
-from src.rag.chatbot import CodeNavigatorChatbot
-
-from rag_evaluation.src.models import ChatbotRun, DatasetItem, RetrievedChunk
 
 
 def load_dataset(path):
@@ -106,7 +113,9 @@ def run_dataset(
     )
 
     runs = []
+    i = 0
     for item in dataset:
+        logger.info(f"Processing case: {i+1}/{len(dataset)}")
         attempts = 0
         delay = 3
 
@@ -118,7 +127,7 @@ def run_dataset(
                 message = str(exc)
                 attempts += 1
 
-                if attempts <= 2 and ("429" in message or "rate" in message.lower()):
+                if attempts < 5 and ("429" in message or "rate" in message.lower()):
                     time.sleep(delay)
                     delay = delay * 2
                     continue
@@ -140,6 +149,7 @@ def run_dataset(
                 break
 
         time.sleep(2)
+        i += 1
     return runs
 
 
