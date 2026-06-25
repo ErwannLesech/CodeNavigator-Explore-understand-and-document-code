@@ -182,8 +182,9 @@ Tu reponds aux questions uniquement a partir du contexte fourni.
 Regles:
 - Base ta reponse strictement sur le contexte recupere, sans invention
 - Si le contexte est insuffisant, indique-le explicitement
-- Cite toujours tes sources avec le format [Source N]
-- Reste technique, clair et concis
+- Reponds comme une reponse de jeu de test: directe, factuelle, concise
+- Vise une seule phrase ou deux phrases maximum
+- N'ajoute pas de citation, de puce, de titre ni de mise en forme Markdown
 - Reponds dans la meme langue que la question
 """
 
@@ -201,4 +202,6 @@ def prompt_rag(query: str, context: str, graph_context: str = "") -> str:
 ## Question
 {query}
 
-Reponds uniquement avec le contexte ci-dessus. Cite les sources avec [Source N]."""
+Reponds uniquement avec le contexte ci-dessus.
+Donne une reponse courte, factuelle et proche du style d'un expected_answer de dataset.
+N'utilise pas de citations ni de markdown."""
