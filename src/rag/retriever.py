@@ -22,8 +22,10 @@ class Retriever:
         qdrant_host: str = "localhost",
         qdrant_port: int = 6333,
         qdrant_collection: str = "CodeNavigatorChunks",
+        embedding_provider: str | None = None,
+        embedding_model: str | None = None,
     ):
-        self.embedder = Embedder()
+        self.embedder = Embedder(provider=embedding_provider, model=embedding_model)
         self.store = VectorStore(
             host=qdrant_host,
             port=qdrant_port,

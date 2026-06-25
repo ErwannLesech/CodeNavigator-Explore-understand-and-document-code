@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   api,
+  type ChatModelOption,
   type ChatMessage,
   type ChatResponse,
   type ChatSource,
@@ -143,11 +144,58 @@ export default function ChatView() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modelOptions, setModelOptions] = useState<ChatModelOption[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<"mistral" | "ollama">(
+    "mistral",
+  );
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState<string>("");
+  const [ollamaReachable, setOllamaReachable] = useState<boolean>(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const res = await api.getChatModels();
+        const options = res.models ?? [];
+        setModelOptions(options);
+        setOllamaBaseUrl(res.ollama_base_url ?? "");
+        setOllamaReachable(Boolean(res.ollama_reachable));
+
+        const provider = (res.default_provider || "mistral") as "mistral" | "ollama";
+        setSelectedProvider(provider);
+
+        const matching = options.filter((item) => item.provider === provider);
+        if (matching.length > 0) {
+          const first = matching.find((item) => item.id === res.default_model) ?? matching[0];
+          setSelectedModel(first.id);
+        }
+      } catch {
+        setModelOptions([]);
+        setOllamaBaseUrl("");
+        setOllamaReachable(false);
+      }
+    };
+    void loadModels();
+  }, []);
+
+  const providerModels = modelOptions.filter((item) => item.provider === selectedProvider);
+
+  useEffect(() => {
+    if (providerModels.length === 0) {
+      if (selectedProvider === "mistral") {
+        setSelectedModel("mistral-large-latest");
+      }
+      return;
+    }
+    if (!providerModels.some((item) => item.id === selectedModel)) {
+      setSelectedModel(providerModels[0].id);
+    }
+  }, [providerModels, selectedModel, selectedProvider]);
 
   const send = async () => {
     const text = input.trim();
@@ -162,7 +210,7 @@ export default function ChatView() {
 
     setLoading(true);
     try {
-      const res: ChatResponse = await api.chat(text);
+      const res: ChatResponse = await api.chat(text, selectedModel, selectedProvider);
       setMessages((prev) => [
         ...prev,
         {
@@ -194,10 +242,43 @@ export default function ChatView() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b bg-card">
         <h2 className="text-lg font-semibold">Assistant</h2>
-        <Button variant="ghost" size="sm" onClick={reset} className="text-muted-foreground">
-          <RotateCcw className="w-4 h-4 mr-1" /> Reinitialiser
-        </Button>
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedProvider}
+            onChange={(e) => setSelectedProvider(e.target.value as "mistral" | "ollama")}
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+            disabled={loading}
+          >
+            <option value="mistral">Mistral</option>
+            <option value="ollama">Ollama</option>
+          </select>
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="max-w-[280px] rounded-md border border-input bg-background px-2 py-1 text-xs"
+            disabled={loading || providerModels.length === 0}
+          >
+            {providerModels.length === 0 ? (
+              <option value="">Aucun modele detecte</option>
+            ) : (
+              providerModels.map((option) => (
+                <option key={`${option.provider}:${option.id}`} value={option.id}>
+                  {option.id}
+                </option>
+              ))
+            )}
+          </select>
+          <Button variant="ghost" size="sm" onClick={reset} className="text-muted-foreground">
+            <RotateCcw className="w-4 h-4 mr-1" /> Reinitialiser
+          </Button>
+        </div>
       </div>
+
+      {selectedProvider === "ollama" && providerModels.length === 0 && (
+        <div className="mx-6 mt-3 rounded-md border border-amber-300/70 bg-amber-100/50 px-3 py-2 text-xs text-amber-900">
+          Aucun modele Ollama detecte via l'API. URL testee: {ollamaBaseUrl || "(non definie)"}. Statut: {ollamaReachable ? "joignable" : "injoignable"}.
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">

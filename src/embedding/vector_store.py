@@ -14,7 +14,7 @@ from src.embedding.chunker import Chunk
 import uuid
 from typing import Any, Iterable, Optional, cast
 
-VECTOR_SIZE = 1024  # text-embedding-3-small
+VECTOR_SIZE = 1024
 # 3072 si tu utilises text-embedding-3-large
 
 
@@ -30,7 +30,7 @@ class VectorStore:
         self.collection_name = os.getenv("QDRANT_COLLECTION", collection_name)
         self.client = QdrantClient(host=host, port=port)
 
-    def create_collection(self, recreate: bool = False):
+    def create_collection(self, recreate: bool = False, vector_size: int = VECTOR_SIZE):
         existing = [c.name for c in self.client.get_collections().collections]
 
         if self.collection_name in existing:
@@ -41,7 +41,7 @@ class VectorStore:
 
         self.client.create_collection(
             collection_name=self.collection_name,
-            vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
+            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
         )
 
     def upsert_chunks(self, chunks: list[Chunk], embeddings: list[list[float]]):

@@ -19,6 +19,8 @@ def build_chunks(args):
         recreate_collection=args.recreate,
         sql_dialect=args.dialect,
         dry_run=args.dry_run,
+        embedding_provider=args.embedding_provider,
+        embedding_model=args.embedding_model,
         qdrant_host=args.qdrant_host,
         qdrant_port=args.qdrant_port,
         qdrant_collection=args.qdrant_collection,
@@ -26,7 +28,7 @@ def build_chunks(args):
 
 
 def build_docs(args, chunks):
-    generator = DocGenerator()
+    generator = DocGenerator(model=args.llm_model)
     return build_project_doc(
         chunks,
         generator,
@@ -78,6 +80,10 @@ def parse_args():
     idx_cmd.add_argument("--qdrant-host", default="localhost")
     idx_cmd.add_argument("--qdrant-port", type=int, default=6333)
     idx_cmd.add_argument("--qdrant-collection", default="CodeNavigatorChunks")
+    idx_cmd.add_argument(
+        "--embedding-provider", choices=["mistral", "ollama"], default="mistral"
+    )
+    idx_cmd.add_argument("--embedding-model", default="")
 
     # Commande generate
     gen_cmd = subparsers.add_parser("generate", help="Generer la documentation")
@@ -87,6 +93,7 @@ def parse_args():
     gen_cmd.add_argument("--qdrant-host", default="localhost")
     gen_cmd.add_argument("--qdrant-port", type=int, default=6333)
     gen_cmd.add_argument("--qdrant-collection", default="CodeNavigatorChunks")
+    gen_cmd.add_argument("--llm-model", default="mistral-large-latest")
 
     # Commande graph
     graph_cmd = subparsers.add_parser("graph", help="Construire le knowledge graph")
@@ -112,6 +119,12 @@ def parse_args():
     full_cmd.add_argument("--qdrant-host", default="localhost")
     full_cmd.add_argument("--qdrant-port", type=int, default=6333)
     full_cmd.add_argument("--qdrant-collection", default="CodeNavigatorChunks")
+    full_cmd.add_argument("--skip-docs", action="store_true")
+    full_cmd.add_argument("--llm-model", default="mistral-large-latest")
+    full_cmd.add_argument(
+        "--embedding-provider", choices=["mistral", "ollama"], default="mistral"
+    )
+    full_cmd.add_argument("--embedding-model", default="")
 
     chat_cmd = subparsers.add_parser("chat", help="Lancer le chatbot RAG en CLI")
     chat_cmd.add_argument("--graph", default="data/output/graph/graph.json")
@@ -142,8 +155,9 @@ def main():
     elif args.command == "full":
         chunks = build_chunks(args)
 
-        documentation = build_docs(args, chunks)
-        export_to_markdown(documentation, args.output_docs)
+        if not args.skip_docs:
+            documentation = build_docs(args, chunks)
+            export_to_markdown(documentation, args.output_docs)
 
         nodes, edges = build_graph_artifacts(args)
         export_graph_json(nodes, edges, args.output_graph)

@@ -1,6 +1,8 @@
 # backend/chat.py
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
+
+from src.llm.providers import list_available_chat_models
 from src.rag.chatbot import CodeNavigatorChatbot
 import os
 from typing import Optional
@@ -14,15 +16,22 @@ _chatbot: Optional[CodeNavigatorChatbot] = None
 def get_chatbot() -> CodeNavigatorChatbot:
     global _chatbot
     if _chatbot is None:
-        if not os.getenv("MISTRAL_API_KEY"):
-            raise RuntimeError("MISTRAL_API_KEY is missing on the backend process")
         graph_path = os.getenv("GRAPH_JSON_PATH", "data/output/graph/graph.json")
-        _chatbot = CodeNavigatorChatbot(graph_json_path=graph_path)
+        _chatbot = CodeNavigatorChatbot(
+            graph_json_path=graph_path,
+            provider=os.getenv("CHAT_PROVIDER"),
+            model=os.getenv("CHAT_MODEL"),
+            embedding_provider=os.getenv("EMBEDDING_PROVIDER"),
+            embedding_model=os.getenv("EMBEDDING_MODEL"),
+            ollama_base_url=os.getenv("OLLAMA_BASE_URL"),
+        )
     return _chatbot
 
 
 class ChatRequest(BaseModel):
     query: str
+    provider: Optional[str] = None
+    model: Optional[str] = None
     filter_language: Optional[str] = None
     filter_type: Optional[str] = None
     filter_file: Optional[str] = None
@@ -45,6 +54,8 @@ def chat(request: ChatRequest):
         bot = get_chatbot()
         response = bot.chat(
             query=request.query,
+            provider=request.provider,
+            model=request.model,
             filter_language=request.filter_language,
             filter_type=request.filter_type,
             filter_file=request.filter_file,
@@ -80,3 +91,8 @@ def chat(request: ChatRequest):
 def reset_chat():
     get_chatbot().reset()
     return ResetResponseDTO(status="ok")
+
+
+@router.get("/models")
+def list_chat_models() -> dict:
+    return list_available_chat_models()

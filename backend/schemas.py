@@ -55,6 +55,11 @@ class PipelineRunRequest(BaseModel):
     recreate: bool = False
     dialect: str = "mysql"
     dry_run: bool = False
+    generate_docs: bool = True
+    llm_provider: str = "mistral"
+    llm_model: str = ""
+    embedding_provider: str = "mistral"
+    embedding_model: str = ""
 
 
 class PipelineStartResponse(BaseModel):

@@ -17,6 +17,12 @@ from src.graph.builder import GraphBuilder
 from src.graph.json_exporter import export_graph_json
 from src.ingestion.parser_dispatcher import dispatch_parser
 from src.ingestion.repo_walker import walk_repo
+from src.llm.providers import (
+    resolve_chat_model,
+    resolve_chat_provider,
+    resolve_embedding_model,
+    resolve_embedding_provider,
+)
 
 from backend.config import MAX_PIPELINE_EVENTS
 from backend.schemas import (
@@ -226,135 +232,168 @@ def run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
 
         store = VectorStore()
         raise_if_pipeline_cancelled()
+
+        embedding_provider = resolve_embedding_provider(request.embedding_provider)
+        embedding_model = resolve_embedding_model(
+            embedding_provider,
+            request.embedding_model,
+        )
+        llm_provider = resolve_chat_provider(request.llm_provider)
+        llm_model = resolve_chat_model(llm_provider, request.llm_model)
+
         append_pipeline_event(
             stage="embedding",
             message="Preparing Qdrant collection",
             progress=42,
-            details={"collection": "CodeNavigatorChunks"},
+            details={
+                "collection": "CodeNavigatorChunks",
+                "provider": embedding_provider,
+                "model": embedding_model,
+            },
         )
-        store.create_collection(recreate=request.recreate)
 
         if request.dry_run:
+            store.create_collection(recreate=request.recreate)
             append_pipeline_event(
                 stage="embedding",
                 message="Dry-run enabled: embedding generation skipped",
                 progress=62,
             )
         else:
-            embedder = Embedder()
-            embeddings: list[list[float]] = []
+            embedder = Embedder(provider=embedding_provider, model=embedding_model)
             total_chunks = len(all_chunks)
             if total_chunks > 0:
-                batch_size = 100
-                for start_idx in range(0, total_chunks, batch_size):
-                    raise_if_pipeline_cancelled()
-                    batch = all_chunks[start_idx : start_idx + batch_size]
-                    response = embedder.client.embeddings.create(
-                        model="mistral-embed", inputs=[chunk.content for chunk in batch]
-                    )
-                    data = response.data if response is not None else []
-                    embeddings.extend(
-                        [item.embedding for item in data if item.embedding is not None]
-                    )
-                    processed = min(start_idx + batch_size, total_chunks)
-                    with PIPELINE_LOCK:
-                        PIPELINE_STATE["stats"]["embeddings"] = len(embeddings)
 
+                def on_embedding_progress(processed: int, total: int) -> None:
+                    raise_if_pipeline_cancelled()
+                    with PIPELINE_LOCK:
+                        PIPELINE_STATE["stats"]["embeddings"] = processed
                     append_pipeline_event(
                         stage="embedding",
-                        message=f"Embedded {processed}/{total_chunks} chunks",
-                        progress=42 + (processed / total_chunks) * 20,
+                        message=f"Embedded {processed}/{total} chunks",
+                        progress=42 + (processed / total) * 20,
                     )
 
-                    if processed < total_chunks and PIPELINE_CANCEL_EVENT.wait(0.5):
-                        raise PipelineCancelledError(
-                            "Pipeline cancelled by user request."
-                        )
+                embeddings = embedder.embed_chunks(
+                    all_chunks,
+                    progress_callback=on_embedding_progress,
+                )
 
-                raise_if_pipeline_cancelled()
+                vector_size = embedder.vector_size or 1024
+                store.create_collection(
+                    recreate=request.recreate,
+                    vector_size=vector_size,
+                )
                 store.upsert_chunks(all_chunks, embeddings)
                 append_pipeline_event(
                     stage="embedding",
                     message="Embeddings uploaded to Qdrant",
                     progress=64,
                 )
-
-        estimated_llm_calls, modules_count = estimate_doc_workload(all_chunks, "full")
-
-        append_pipeline_event(
-            stage="docs",
-            message="Generating project documentation",
-            progress=70,
-            details={
-                "output": request.output_docs,
-                "estimated_llm_calls": estimated_llm_calls,
-                "modules": modules_count,
-            },
-        )
-
-        docs_result: dict[str, Any] = {
-            "completed": 0,
-            "total": estimated_llm_calls,
-            "last_label": None,
-        }
-
-        def docs_worker() -> None:
-            generator = DocGenerator()
-
-            def on_doc_progress(done: int, total: int, label: str) -> None:
-                docs_result["completed"] = done
-                docs_result["total"] = total
-                docs_result["last_label"] = label
-
-            project_doc = build_project_doc(
-                all_chunks,
-                generator,
-                detail_level="full",
-                progress_callback=on_doc_progress,
-            )
-            export_to_markdown(project_doc, request.output_docs)
-
-        docs_thread = threading.Thread(target=docs_worker, daemon=True)
-        docs_thread.start()
-
-        docs_elapsed = 0
-        docs_heartbeat_seconds = 6
-        while docs_thread.is_alive():
-            if PIPELINE_CANCEL_EVENT.wait(docs_heartbeat_seconds):
-                raise PipelineCancelledError("Pipeline cancelled by user request.")
-            docs_elapsed += docs_heartbeat_seconds
-            completed = int(docs_result.get("completed") or 0)
-            total = int(docs_result.get("total") or estimated_llm_calls)
-            label = docs_result.get("last_label") or "starting"
-            if total > 0 and completed > 0:
-                docs_progress = min(83.5, 70 + (completed / total) * 13.5)
             else:
-                docs_progress = min(83.5, 70 + (docs_elapsed / 240) * 13.5)
+                store.create_collection(recreate=request.recreate)
+
+        docs_enabled = bool(request.generate_docs)
+        docs_skip_reason = ""
+        if docs_enabled and llm_provider != "mistral":
+            docs_enabled = False
+            docs_skip_reason = "only Mistral is supported for docs generation"
+
+        if docs_enabled:
+            estimated_llm_calls, modules_count = estimate_doc_workload(
+                all_chunks, "full"
+            )
+
             append_pipeline_event(
                 stage="docs",
-                message=(
-                    "Documentation generation in progress "
-                    f"({completed}/{total}, {docs_elapsed}s elapsed)"
-                ),
-                progress=docs_progress,
+                message="Generating project documentation",
+                progress=70,
                 details={
-                    "estimated_llm_calls": estimated_llm_calls,
                     "output": request.output_docs,
-                    "docs_done": completed,
-                    "docs_total": total,
-                    "docs_last_label": label,
+                    "estimated_llm_calls": estimated_llm_calls,
+                    "modules": modules_count,
+                    "provider": llm_provider,
+                    "model": llm_model,
                 },
             )
 
-        raise_if_pipeline_cancelled()
-        docs_thread.join()
+            docs_result: dict[str, Any] = {
+                "completed": 0,
+                "total": estimated_llm_calls,
+                "last_label": None,
+            }
 
-        append_pipeline_event(
-            stage="docs",
-            message="Documentation generated",
-            progress=84,
-            details={"output": request.output_docs},
-        )
+            def docs_worker() -> None:
+                generator = DocGenerator(model=llm_model)
+
+                def on_doc_progress(done: int, total: int, label: str) -> None:
+                    docs_result["completed"] = done
+                    docs_result["total"] = total
+                    docs_result["last_label"] = label
+
+                project_doc = build_project_doc(
+                    all_chunks,
+                    generator,
+                    detail_level="full",
+                    progress_callback=on_doc_progress,
+                )
+                export_to_markdown(project_doc, request.output_docs)
+
+            docs_thread = threading.Thread(target=docs_worker, daemon=True)
+            docs_thread.start()
+
+            docs_elapsed = 0
+            docs_heartbeat_seconds = 6
+            while docs_thread.is_alive():
+                if PIPELINE_CANCEL_EVENT.wait(docs_heartbeat_seconds):
+                    raise PipelineCancelledError("Pipeline cancelled by user request.")
+                docs_elapsed += docs_heartbeat_seconds
+                completed = int(docs_result.get("completed") or 0)
+                total = int(docs_result.get("total") or estimated_llm_calls)
+                label = docs_result.get("last_label") or "starting"
+                if total > 0 and completed > 0:
+                    docs_progress = min(83.5, 70 + (completed / total) * 13.5)
+                else:
+                    docs_progress = min(83.5, 70 + (docs_elapsed / 240) * 13.5)
+                append_pipeline_event(
+                    stage="docs",
+                    message=(
+                        "Documentation generation in progress "
+                        f"({completed}/{total}, {docs_elapsed}s elapsed)"
+                    ),
+                    progress=docs_progress,
+                    details={
+                        "estimated_llm_calls": estimated_llm_calls,
+                        "output": request.output_docs,
+                        "docs_done": completed,
+                        "docs_total": total,
+                        "docs_last_label": label,
+                    },
+                )
+
+            raise_if_pipeline_cancelled()
+            docs_thread.join()
+
+            append_pipeline_event(
+                stage="docs",
+                message="Documentation generated",
+                progress=84,
+                details={"output": request.output_docs},
+            )
+        else:
+            append_pipeline_event(
+                stage="docs",
+                message=(
+                    "Documentation generation skipped"
+                    if not docs_skip_reason
+                    else f"Documentation skipped: {docs_skip_reason}"
+                ),
+                progress=84,
+                details={
+                    "generate_docs": request.generate_docs,
+                    "provider": llm_provider,
+                },
+            )
 
         append_pipeline_event(
             stage="graph",
@@ -374,6 +413,10 @@ def run_pipeline_job(job_id: str, request: PipelineRunRequest) -> None:
         raise_if_pipeline_cancelled()
 
         os.environ["GRAPH_JSON_PATH"] = graph_json_path
+        os.environ["CHAT_PROVIDER"] = llm_provider
+        os.environ["CHAT_MODEL"] = llm_model
+        os.environ["EMBEDDING_PROVIDER"] = embedding_provider
+        os.environ["EMBEDDING_MODEL"] = embedding_model
         import backend.chat as chat_backend
 
         chat_backend._chatbot = None

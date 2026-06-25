@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, Play, Square, Database, ExternalLink, RotateCcw } from "lucide-react";
-import { api, type PipelineRunRequest, type PipelineStatus, type QdrantInfo } from "@/lib/api";
+import {
+  api,
+  type ChatModelOption,
+  type PipelineRunRequest,
+  type PipelineStatus,
+  type QdrantInfo,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 const defaultForm: PipelineRunRequest = {
@@ -11,6 +17,11 @@ const defaultForm: PipelineRunRequest = {
   recreate: false,
   dialect: "mysql",
   dry_run: false,
+  generate_docs: true,
+  llm_provider: "mistral",
+  llm_model: "",
+  embedding_provider: "mistral",
+  embedding_model: "",
 };
 
 export default function PipelineView() {
@@ -21,6 +32,9 @@ export default function PipelineView() {
   const [submitting, setSubmitting] = useState(false);
   const [refreshingQdrant, setRefreshingQdrant] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chatModels, setChatModels] = useState<ChatModelOption[]>([]);
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState<string>("");
+  const [ollamaReachable, setOllamaReachable] = useState<boolean>(false);
 
   const fetchStatus = async () => {
     try {
@@ -50,7 +64,32 @@ export default function PipelineView() {
   useEffect(() => {
     void fetchStatus();
     void fetchQdrant();
+
+    const loadModels = async () => {
+      try {
+        const res = await api.getChatModels();
+        setChatModels(res.models ?? []);
+        setOllamaBaseUrl(res.ollama_base_url ?? "");
+        setOllamaReachable(Boolean(res.ollama_reachable));
+
+        if (res.default_provider === "mistral" || res.default_provider === "ollama") {
+          setForm((prev) => ({
+            ...prev,
+            llm_provider: res.default_provider,
+            llm_model: res.default_model || prev.llm_model,
+          }));
+        }
+      } catch {
+        setChatModels([]);
+        setOllamaBaseUrl("");
+        setOllamaReachable(false);
+      }
+    };
+    void loadModels();
   }, []);
+
+  const llmOptions = chatModels.filter((m) => m.provider === form.llm_provider);
+  const embeddingOptions = chatModels.filter((m) => m.provider === form.embedding_provider);
 
   useEffect(() => {
     const running = status?.status === "running" || status?.status === "queued";
@@ -194,7 +233,91 @@ export default function PipelineView() {
                 />
                 Indexation a blanc (sans embeddings)
               </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.generate_docs}
+                  onChange={(e) => setForm((prev) => ({ ...prev, generate_docs: e.target.checked }))}
+                />
+                Generer la documentation
+              </label>
             </div>
+
+            <label className="space-y-1">
+              <span className="text-sm">Provider LLM</span>
+              <select
+                value={form.llm_provider}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    llm_provider: e.target.value as "mistral" | "ollama",
+                    llm_model: "",
+                  }))
+                }
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="mistral">Mistral</option>
+                <option value="ollama">Ollama</option>
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">Modele LLM (chat/docs)</span>
+              <select
+                value={form.llm_model}
+                onChange={(e) => setForm((prev) => ({ ...prev, llm_model: e.target.value }))}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Par defaut</option>
+                {llmOptions.map((opt) => (
+                  <option key={`${opt.provider}:${opt.id}`} value={opt.id}>
+                    {opt.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">Provider embeddings</span>
+              <select
+                value={form.embedding_provider}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    embedding_provider: e.target.value as "mistral" | "ollama",
+                    embedding_model: "",
+                  }))
+                }
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="mistral">Mistral</option>
+                <option value="ollama">Ollama</option>
+              </select>
+            </label>
+
+            <label className="space-y-1">
+              <span className="text-sm">Modele embeddings</span>
+              <select
+                value={form.embedding_model}
+                onChange={(e) => setForm((prev) => ({ ...prev, embedding_model: e.target.value }))}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Par defaut</option>
+                {embeddingOptions.map((opt) => (
+                  <option key={`embed:${opt.provider}:${opt.id}`} value={opt.id}>
+                    {opt.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {(form.llm_provider === "ollama" || form.embedding_provider === "ollama") &&
+              llmOptions.length === 0 &&
+              embeddingOptions.length === 0 && (
+                <p className="md:col-span-2 rounded-md border border-amber-300/70 bg-amber-100/50 px-3 py-2 text-xs text-amber-900">
+                  Aucun modele Ollama detecte via l'API. URL testee: {ollamaBaseUrl || "(non definie)"}. Statut: {ollamaReachable ? "joignable" : "injoignable"}.
+                </p>
+              )}
           </div>
 
           <div className="flex flex-wrap gap-2">
