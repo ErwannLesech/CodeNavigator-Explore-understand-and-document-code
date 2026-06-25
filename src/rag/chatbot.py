@@ -29,22 +29,28 @@ class CodeNavigatorChatbot:
         graph_json_path: Optional[str] = None,
         top_k: int = 6,
         model: str = "mistral-large-latest",
-        qdrant_host: str = "localhost",
-        qdrant_port: int = 6333,
-        qdrant_collection: str = "CodeNavigatorChunks",
+        qdrant_host: Optional[str] = None,
+        qdrant_port: Optional[int] = None,
+        qdrant_collection: Optional[str] = None,
     ):
+        resolved_qdrant_host = qdrant_host or os.getenv("QDRANT_HOST", "localhost")
+        resolved_qdrant_port = qdrant_port or int(os.getenv("QDRANT_PORT", "6333"))
+        resolved_qdrant_collection = qdrant_collection or os.getenv(
+            "QDRANT_COLLECTION", "CodeNavigatorChunks"
+        )
+
         self.client = Mistral(api_key=os.environ["MISTRAL_API_KEY"])
         self.model = model
         self.retriever = Retriever(
             top_k=top_k,
-            qdrant_host=qdrant_host,
-            qdrant_port=qdrant_port,
-            qdrant_collection=qdrant_collection,
+            qdrant_host=resolved_qdrant_host,
+            qdrant_port=resolved_qdrant_port,
+            qdrant_collection=resolved_qdrant_collection,
         )
         self.history: list[Message] = []
-        self.qdrant_host = qdrant_host
-        self.qdrant_port = qdrant_port
-        self.qdrant_collection = qdrant_collection
+        self.qdrant_host = resolved_qdrant_host
+        self.qdrant_port = resolved_qdrant_port
+        self.qdrant_collection = resolved_qdrant_collection
 
         self.graph_provider = self._init_graph_provider(graph_json_path)
 

@@ -1,5 +1,6 @@
 # backend/chat.py
 from fastapi import APIRouter, HTTPException, status
+from mistralai import SDKError
 from pydantic import BaseModel
 from src.rag.chatbot import CodeNavigatorChatbot
 import os
@@ -9,6 +10,32 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 # Shared instance initialized at API startup.
 _chatbot: Optional[CodeNavigatorChatbot] = None
+
+
+def _raise_provider_http_error(exc: SDKError) -> None:
+    if exc.status_code in (401, 403):
+        detail = "Chat provider authentication failed. Check backend MISTRAL_API_KEY."
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=detail,
+        ) from exc
+
+    if exc.status_code == 429:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Chat provider rate limit reached. Try again shortly.",
+        ) from exc
+
+    if exc.status_code >= 500:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Chat provider error: {exc}",
+        ) from exc
+
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=f"Chat provider request failed: {exc}",
+    ) from exc
 
 
 def get_chatbot() -> CodeNavigatorChatbot:
@@ -49,6 +76,8 @@ def chat(request: ChatRequest):
             filter_type=request.filter_type,
             filter_file=request.filter_file,
         )
+    except SDKError as exc:
+        _raise_provider_http_error(exc)
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
