@@ -61,7 +61,7 @@ def run_evaluation(
     cases = []
     i = 0
     for item, run in zip(dataset, runs):
-        logger.info(f"Computing metrics for case: {i+1}/{len(dataset)}")
+        logger.info(f"Computing metrics for case: {i + 1}/{len(dataset)}")
         metrics = compute_case_metrics(item, run)
         row = case_to_dict(run)
         row["metrics"] = case_metrics_to_dict(metrics)

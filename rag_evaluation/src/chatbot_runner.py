@@ -115,7 +115,7 @@ def run_dataset(
     runs = []
     i = 0
     for item in dataset:
-        logger.info(f"Processing case: {i+1}/{len(dataset)}")
+        logger.info(f"Processing case: {i + 1}/{len(dataset)}")
         attempts = 0
         delay = 3
 
